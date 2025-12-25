@@ -335,9 +335,10 @@ class MatchMaker:
                     if can_add_match_type(r, 'female', current):
                         round_types[r].append('female')
                         remaining_female -= 1
-                # 이미 남복이 있으면 추가 안함 (이미 처리됨)
+                # 이미 남복이 있으면 여복+남복 가능 (이미 인원 체크됨)
                 elif 'male' in current:
-                    pass
+                    round_types[r].append('female')
+                    remaining_female -= 1
                 # 빈 라운드
                 elif len(current) == 0:
                     round_types[r].append('female')
@@ -414,16 +415,26 @@ class MatchMaker:
         for r in round_list:
             while len(round_types[r]) < slots_per_round:
                 added = False
-                # 우선순위: 남복+혼복 조합이 가장 유연함
-                if can_add_match_type(r, 'male', round_types[r]):
-                    round_types[r].append('male')
-                    added = True
-                elif can_add_match_type(r, 'mixed', round_types[r]):
+                
+                # 혼복 우선 (양 성별 모두에게 게임 기회)
+                if can_add_match_type(r, 'mixed', round_types[r]):
                     round_types[r].append('mixed')
                     added = True
-                elif can_add_match_type(r, 'female', round_types[r]):
-                    round_types[r].append('female')
-                    added = True
+                # 다수 성별 복식 차선
+                elif len(self.males) >= len(self.females):
+                    if can_add_match_type(r, 'male', round_types[r]):
+                        round_types[r].append('male')
+                        added = True
+                    elif can_add_match_type(r, 'female', round_types[r]):
+                        round_types[r].append('female')
+                        added = True
+                else:
+                    if can_add_match_type(r, 'female', round_types[r]):
+                        round_types[r].append('female')
+                        added = True
+                    elif can_add_match_type(r, 'male', round_types[r]):
+                        round_types[r].append('male')
+                        added = True
                 
                 if not added:
                     break
@@ -636,6 +647,25 @@ class MatchMaker:
         
         # 게임이 가장 부족한 사람들 조합에 보너스
         score -= total_deficit * 100
+        
+        # 1.1 같은 성별 내 게임수 편차 페널티 (균등화 강화!)
+        for p in all_players:
+            same_gender = self.females if p.gender == 'F' else self.males
+            played = self.games_played.get(p.id, 0)
+            
+            # 같은 성별 중 가장 적게 한 사람의 게임수
+            min_games_same_gender = min(self.games_played.get(sp.id, 0) for sp in same_gender)
+            max_games_same_gender = max(self.games_played.get(sp.id, 0) for sp in same_gender)
+            
+            # 내가 같은 성별 최소보다 많이 했으면 페널티
+            diff_from_min = played - min_games_same_gender
+            if diff_from_min >= 1:
+                score += diff_from_min * 50000  # 매우 큰 페널티 (균등화 최우선!)
+            
+            # 같은 성별 내 편차가 2 이상이면 최소 게임수인 사람만 선택
+            gender_gap = max_games_same_gender - min_games_same_gender
+            if gender_gap >= 2 and played > min_games_same_gender:
+                score += 100000  # 사실상 불가능
         
         # 1.5. 매치 타입별 목표 달성 (중요!)
         total_type_deficit = 0
