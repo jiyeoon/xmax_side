@@ -409,6 +409,25 @@ class MatchMaker:
                 if not added:
                     break
         
+        # 7단계: 빈 슬롯 채우기 (계획에 없어도 가능한 매치 추가!)
+        # 코트가 놀지 않도록 추가 매치 생성
+        for r in round_list:
+            while len(round_types[r]) < slots_per_round:
+                added = False
+                # 우선순위: 남복+혼복 조합이 가장 유연함
+                if can_add_match_type(r, 'male', round_types[r]):
+                    round_types[r].append('male')
+                    added = True
+                elif can_add_match_type(r, 'mixed', round_types[r]):
+                    round_types[r].append('mixed')
+                    added = True
+                elif can_add_match_type(r, 'female', round_types[r]):
+                    round_types[r].append('female')
+                    added = True
+                
+                if not added:
+                    break
+        
         # 각 라운드 내 매치 순서 랜덤화
         for r in round_types:
             random.shuffle(round_types[r])
