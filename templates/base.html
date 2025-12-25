@@ -1,0 +1,74 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token }}">
+    <title>{% block title %}HumbleB{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&family=Quicksand:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=15">
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <div class="app-container">
+        <!-- 사이드 네비게이션 -->
+        <nav class="sidebar">
+            <div class="sidebar-header">
+                <a href="{% url 'home' %}" class="logo">
+                    <span class="logo-icon">🎾</span>
+                    <span class="logo-text">HumbleB</span>
+                </a>
+            </div>
+            <ul class="nav-menu">
+                <li class="nav-item {% if request.resolver_match.url_name == 'home' %}active{% endif %}">
+                    <a href="{% url 'home' %}">
+                        <span class="nav-icon">🏠</span>
+                        <span class="nav-text">홈</span>
+                    </a>
+                </li>
+                <li class="nav-item {% if request.resolver_match.app_name == 'schedule' %}active{% endif %}">
+                    <a href="{% url 'schedule:calendar' %}">
+                        <span class="nav-icon">📅</span>
+                        <span class="nav-text">일정</span>
+                    </a>
+                </li>
+                <li class="nav-item {% if request.resolver_match.app_name == 'matchmaking' %}active{% endif %}">
+                    <a href="{% url 'matchmaking:page' %}">
+                        <span class="nav-icon">🎯</span>
+                        <span class="nav-text">대진표</span>
+                    </a>
+                </li>
+                <li class="nav-item {% if request.resolver_match.app_name == 'members' %}active{% endif %}">
+                    <a href="{% url 'members:list' %}">
+                        <span class="nav-icon">👥</span>
+                        <span class="nav-text">멤버</span>
+                    </a>
+                </li>
+            </ul>
+            <div class="sidebar-footer">
+                <div class="club-mascot">🎾✨</div>
+            </div>
+        </nav>
+
+        <!-- 메인 콘텐츠 -->
+        <main class="main-content">
+            <header class="page-header">
+                <h1 class="page-title">{% block page_title %}{% endblock %}</h1>
+                <div class="header-actions">
+                    {% block header_actions %}{% endblock %}
+                </div>
+            </header>
+            <div class="content-wrapper">
+                {% block content %}{% endblock %}
+            </div>
+        </main>
+    </div>
+
+    <script src="{% static 'js/main.js' %}"></script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>
+

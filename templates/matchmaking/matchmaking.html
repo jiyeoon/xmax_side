@@ -1,0 +1,1186 @@
+{% extends 'base.html' %}
+
+{% block title %}대진표 - 테니스 클럽{% endblock %}
+
+{% block page_title %}대진표 생성{% endblock %}
+
+{% block content %}
+<div class="card" style="margin-bottom: 24px;">
+    <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+        <h3 class="card-title" style="margin: 0;">👥 참가자 선택</h3>
+        <button class="btn btn-secondary btn-sm" onclick="resetSelection()" style="font-size: 12px; padding: 6px 12px;">
+            🔄 초기화
+        </button>
+    </div>
+    <div class="card-body">
+        <!-- 멤버 선택 -->
+        <div class="section-title">🎾 클럽 멤버</div>
+        <div class="participant-grid" id="memberSelection">
+            {% for member in members %}
+            <div class="participant-card" data-member-id="{{ member.id }}" data-name="{{ member.name }}" data-ntrp="{{ member.ntrp }}" data-gender="{{ member.gender }}" onclick="toggleMember(this)">
+                <div class="participant-name">{{ member.name }}</div>
+                <div class="participant-info">{{ member.get_gender_display }} | NTRP {{ member.ntrp }}</div>
+                <div class="timing-select" style="margin-top: 10px; display: none;">
+                    <div class="timing-buttons">
+                        <button type="button" class="timing-btn active" data-value="full" onclick="event.stopPropagation(); selectTiming(this)">전체참석</button>
+                        <button type="button" class="timing-btn" data-value="late" onclick="event.stopPropagation(); selectTiming(this)">30분 늦참</button>
+                        <button type="button" class="timing-btn" data-value="early" onclick="event.stopPropagation(); selectTiming(this)">30분 일퇴</button>
+                    </div>
+                    <input type="hidden" class="timing-value" value="full">
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        
+        <!-- 게스트 추가 -->
+        <div class="section-title" style="margin-top: 24px;">🙋 게스트 추가</div>
+        <div class="guest-list" id="guestList">
+            <!-- 동적으로 추가됨 -->
+        </div>
+        <button class="btn btn-secondary" onclick="addGuest()">
+            ➕ 게스트 추가
+        </button>
+    </div>
+</div>
+
+<!-- 설정 -->
+<div class="card" style="margin-bottom: 24px;">
+    <div class="card-header">
+        <h3 class="card-title">⚙️ 대진 설정</h3>
+    </div>
+    <div class="card-body">
+        <!-- 참가자 현황 -->
+        <div class="participant-summary" id="participantSummary">
+            <div class="summary-item total">
+                <span class="summary-icon">👥</span>
+                <span class="summary-label">총 인원</span>
+                <span class="summary-value" id="totalCount">0명</span>
+            </div>
+            <div class="summary-item male">
+                <span class="summary-icon">🙋‍♂️</span>
+                <span class="summary-label">남자</span>
+                <span class="summary-value" id="maleCount">0명</span>
+            </div>
+            <div class="summary-item female">
+                <span class="summary-icon">🙋‍♀️</span>
+                <span class="summary-label">여자</span>
+                <span class="summary-value" id="femaleCount">0명</span>
+            </div>
+        </div>
+        
+        <div class="settings-row">
+            <div class="setting-item">
+                <label>📅 날짜:</label>
+                <input type="date" id="matchDate" class="form-control" style="min-width: 150px;">
+            </div>
+            <div class="setting-item">
+                <label>코트 수:</label>
+                <input type="number" id="numCourts" class="form-control" value="2" min="1" max="10">
+            </div>
+            <div class="setting-item">
+                <label>라운드 수:</label>
+                <input type="number" id="numRounds" class="form-control" value="6" min="1" max="20">
+            </div>
+        </div>
+        <div class="settings-row">
+            <button class="btn btn-primary" onclick="generateMatches()">
+                🎯 대진표 생성
+            </button>
+            <button class="btn btn-secondary" id="regenerateBtn" onclick="regenerateMatches()" style="display: none;">
+                🔄 다시 생성
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- 대진표 결과 -->
+<div id="matchResult" style="display: none;">
+    <!-- 게임 수 통계 -->
+    <div class="card" style="margin-bottom: 24px;">
+        <div class="card-header">
+            <h3 class="card-title">📈 참가자별 게임 수 통계</h3>
+        </div>
+        <div class="card-body">
+            <div class="table-wrapper">
+                <table class="stats-table" id="statsTable">
+                    <thead>
+                        <tr>
+                            <th>참가자</th>
+                            <th>전체</th>
+                            <th>👬 남복</th>
+                            <th>👭 여복</th>
+                            <th>👫 혼복</th>
+                            <th>😴 휴식</th>
+                        </tr>
+                    </thead>
+                    <tbody id="statsTableBody">
+                        <!-- 동적으로 생성됨 -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- 탭 메뉴 -->
+    <div class="tabs" style="margin-bottom: 20px;">
+        <button class="tab active" data-tab="table-view">📊 표 뷰</button>
+        <button class="tab" data-tab="card-view">📋 카드 뷰</button>
+    </div>
+
+    <!-- 표 뷰 -->
+    <div id="table-view" class="tab-content">
+        <div class="card">
+            <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+                <h3 class="card-title">📊 대진표 요약</h3>
+                <div style="display: flex; gap: 8px;">
+                    <button class="btn btn-secondary btn-sm" onclick="openEditModal()">
+                        ✏️ 수정
+                    </button>
+                    <button class="btn btn-primary btn-sm" onclick="downloadTableAsImage()">
+                        📥 이미지 다운로드
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div id="scheduleTableWrapper">
+                    <div id="scheduleTableContainer">
+                        <!-- 동적으로 생성됨 -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 카드 뷰 -->
+    <div id="card-view" class="tab-content" style="display: none;">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">📋 대진표</h3>
+            </div>
+            <div class="card-body">
+                <div class="match-schedule" id="matchSchedule">
+                    <!-- 동적으로 생성됨 -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- html2canvas for image download -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script>
+let selectedMembers = [];
+let guests = [];
+let currentSessionId = null;
+let currentSchedule = null; // 현재 스케줄 저장
+
+// ===== localStorage 저장/복원 =====
+const STORAGE_KEY = 'matchmaking_data';
+
+function saveToStorage() {
+    const data = {
+        selectedMembers: [],
+        guests: []
+    };
+    
+    // 선택된 멤버 저장
+    document.querySelectorAll('.participant-card.selected').forEach(card => {
+        const timing = card.querySelector('.timing-value')?.value || 'full';
+        data.selectedMembers.push({
+            id: card.dataset.memberId,
+            timing: timing
+        });
+    });
+    
+    // 게스트 저장
+    document.querySelectorAll('.guest-item').forEach(item => {
+        const name = item.querySelector('.guest-name')?.value || '';
+        const gender = item.querySelector('.guest-gender')?.value || 'M';
+        const ntrp = item.querySelector('.guest-ntrp')?.value || '2.5';
+        const timing = item.querySelector('.guest-timing')?.value || 'full';
+        
+        if (name) {
+            data.guests.push({ name, gender, ntrp, timing });
+        }
+    });
+    
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+}
+
+function loadFromStorage() {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (!stored) return;
+    
+    try {
+        const data = JSON.parse(stored);
+        
+        // 멤버 선택 복원
+        if (data.selectedMembers) {
+            data.selectedMembers.forEach(member => {
+                const card = document.querySelector(`.participant-card[data-member-id="${member.id}"]`);
+                if (card) {
+                    card.classList.add('selected');
+                    const timingSelect = card.querySelector('.timing-select');
+                    if (timingSelect) {
+                        timingSelect.style.display = 'block';
+                        // 타이밍 버튼 복원
+                        const timingBtn = card.querySelector(`.timing-btn[data-value="${member.timing}"]`);
+                        if (timingBtn) {
+                            card.querySelectorAll('.timing-btn').forEach(b => b.classList.remove('active'));
+                            timingBtn.classList.add('active');
+                            const hiddenInput = card.querySelector('.timing-value');
+                            if (hiddenInput) hiddenInput.value = member.timing;
+                        }
+                    }
+                }
+            });
+        }
+        
+        // 게스트 복원
+        if (data.guests && data.guests.length > 0) {
+            data.guests.forEach(guest => {
+                addGuestWithData(guest);
+            });
+        }
+        
+        // 참가자 수 업데이트
+        updateParticipantCount();
+    } catch (e) {
+        console.error('Failed to load from storage:', e);
+    }
+}
+
+function clearStorage() {
+    localStorage.removeItem(STORAGE_KEY);
+}
+
+// 페이지 로드 시 복원
+document.addEventListener('DOMContentLoaded', function() {
+    loadFromStorage();
+});
+
+// ===== 기존 함수들 =====
+
+// 멤버 선택 토글
+function toggleMember(card) {
+    card.classList.toggle('selected');
+    const timingSelect = card.querySelector('.timing-select');
+    
+    if (card.classList.contains('selected')) {
+        timingSelect.style.display = 'block';
+    } else {
+        timingSelect.style.display = 'none';
+    }
+    
+    // 참가자 수 업데이트
+    updateParticipantCount();
+    
+    // localStorage에 저장
+    saveToStorage();
+}
+
+// 타이밍 버튼 선택
+function selectTiming(btn) {
+    const container = btn.closest('.timing-buttons');
+    container.querySelectorAll('.timing-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    
+    // hidden input에 값 저장
+    const hiddenInput = btn.closest('.timing-select').querySelector('.timing-value');
+    hiddenInput.value = btn.dataset.value;
+    
+    // localStorage에 저장
+    saveToStorage();
+}
+
+// 참가자 수 업데이트
+function updateParticipantCount() {
+    let total = 0;
+    let male = 0;
+    let female = 0;
+    
+    // 선택된 멤버 카운트
+    document.querySelectorAll('.participant-card.selected').forEach(card => {
+        total++;
+        if (card.dataset.gender === 'M') {
+            male++;
+        } else {
+            female++;
+        }
+    });
+    
+    // 게스트 카운트
+    document.querySelectorAll('.guest-item').forEach(item => {
+        const name = item.querySelector('.guest-name').value;
+        if (name) {
+            total++;
+            const gender = item.querySelector('.guest-gender').value;
+            if (gender === 'M') {
+                male++;
+            } else {
+                female++;
+            }
+        }
+    });
+    
+    // UI 업데이트
+    document.getElementById('totalCount').textContent = `${total}명`;
+    document.getElementById('maleCount').textContent = `${male}명`;
+    document.getElementById('femaleCount').textContent = `${female}명`;
+    
+    // 스타일 업데이트 (인원에 따라)
+    const summaryEl = document.getElementById('participantSummary');
+    if (total >= 4) {
+        summaryEl.classList.add('ready');
+        summaryEl.classList.remove('not-ready');
+    } else {
+        summaryEl.classList.add('not-ready');
+        summaryEl.classList.remove('ready');
+    }
+}
+
+// 게스트 추가
+let guestCount = 0;
+function addGuest() {
+    guestCount++;
+    const guestHtml = `
+        <div class="guest-item" id="guest-${guestCount}">
+            <div class="form-group">
+                <label class="form-label">이름</label>
+                <input type="text" class="form-control guest-name" placeholder="게스트 이름" onchange="updateParticipantCount(); saveToStorage();">
+            </div>
+            <div class="form-group">
+                <label class="form-label">성별</label>
+                <select class="form-control guest-gender" onchange="updateParticipantCount(); saveToStorage();">
+                    <option value="M">남성</option>
+                    <option value="F">여성</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">NTRP</label>
+                <select class="form-control guest-ntrp" onchange="saveToStorage();">
+                    {% for value, label in ntrp_choices %}
+                    <option value="{{ value }}" {% if value == '2.5' %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">참석</label>
+                <select class="form-control guest-timing" onchange="saveToStorage();">
+                    <option value="full">전체참석</option>
+                    <option value="late">30분 늦참</option>
+                    <option value="early">30분 일퇴</option>
+                </select>
+            </div>
+            <button class="btn btn-danger btn-sm" onclick="removeGuest(${guestCount})">🗑️</button>
+        </div>
+    `;
+    document.getElementById('guestList').insertAdjacentHTML('beforeend', guestHtml);
+    updateParticipantCount();
+    saveToStorage();
+}
+
+// 데이터와 함께 게스트 추가 (복원용)
+function addGuestWithData(guest) {
+    guestCount++;
+    const guestHtml = `
+        <div class="guest-item" id="guest-${guestCount}">
+            <div class="form-group">
+                <label class="form-label">이름</label>
+                <input type="text" class="form-control guest-name" placeholder="게스트 이름" onchange="updateParticipantCount(); saveToStorage();">
+            </div>
+            <div class="form-group">
+                <label class="form-label">성별</label>
+                <select class="form-control guest-gender" onchange="updateParticipantCount(); saveToStorage();">
+                    <option value="M">남성</option>
+                    <option value="F">여성</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">NTRP</label>
+                <select class="form-control guest-ntrp" onchange="saveToStorage();">
+                    {% for value, label in ntrp_choices %}
+                    <option value="{{ value }}">{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">참석</label>
+                <select class="form-control guest-timing" onchange="saveToStorage();">
+                    <option value="full">전체참석</option>
+                    <option value="late">30분 늦참</option>
+                    <option value="early">30분 일퇴</option>
+                </select>
+            </div>
+            <button class="btn btn-danger btn-sm" onclick="removeGuest(${guestCount})">🗑️</button>
+        </div>
+    `;
+    document.getElementById('guestList').insertAdjacentHTML('beforeend', guestHtml);
+    
+    // 값 직접 설정
+    const lastGuest = document.getElementById(`guest-${guestCount}`);
+    if (lastGuest) {
+        if (guest.name) lastGuest.querySelector('.guest-name').value = guest.name;
+        if (guest.gender) lastGuest.querySelector('.guest-gender').value = guest.gender;
+        if (guest.ntrp) lastGuest.querySelector('.guest-ntrp').value = guest.ntrp;
+        if (guest.timing) lastGuest.querySelector('.guest-timing').value = guest.timing;
+    }
+}
+
+function removeGuest(id) {
+    document.getElementById(`guest-${id}`).remove();
+    updateParticipantCount();
+    saveToStorage();
+}
+
+// 선택 초기화
+function resetSelection() {
+    if (!confirm('선택된 모든 멤버와 게스트를 초기화할까요?')) {
+        return;
+    }
+    
+    // 멤버 선택 해제
+    document.querySelectorAll('.participant-card.selected').forEach(card => {
+        card.classList.remove('selected');
+        // 타이밍 선택 숨기기 & 초기화
+        const timingSelect = card.querySelector('.timing-select');
+        if (timingSelect) {
+            timingSelect.style.display = 'none';
+            // 타이밍 값 초기화
+            const timingValue = timingSelect.querySelector('.timing-value');
+            if (timingValue) timingValue.value = 'full';
+            // 버튼 상태 초기화 (전체참석만 활성화)
+            timingSelect.querySelectorAll('.timing-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.value === 'full');
+            });
+        }
+    });
+    
+    // 게스트 목록 비우기
+    document.getElementById('guestList').innerHTML = '';
+    guestCount = 0;
+    
+    // localStorage 초기화
+    localStorage.removeItem(STORAGE_KEY);
+    
+    // 참가자 수 업데이트
+    updateParticipantCount();
+    
+    // 알림
+    showToast('✅ 초기화되었습니다', 'success');
+}
+
+// 참가자 데이터 수집
+function collectParticipants() {
+    const participants = [];
+    const numRounds = parseInt(document.getElementById('numRounds').value);
+    
+    // 선택된 멤버
+    document.querySelectorAll('.participant-card.selected').forEach(card => {
+        const timingInput = card.querySelector('.timing-value');
+        const timing = timingInput ? timingInput.value : 'full';
+        
+        // 30분 늦참 = 2라운드부터, 30분 일퇴 = 마지막-1 라운드까지
+        let startRound = 1;
+        let endRound = numRounds;
+        
+        if (timing === 'late') {
+            startRound = 2;
+        } else if (timing === 'early') {
+            endRound = Math.max(1, numRounds - 1);
+        }
+        
+        participants.push({
+            member_id: parseInt(card.dataset.memberId),
+            name: card.dataset.name,
+            gender: card.dataset.gender,
+            timing: timing,
+            start_round: startRound,
+            end_round: endRound,
+        });
+    });
+    
+    // 게스트
+    document.querySelectorAll('.guest-item').forEach(item => {
+        const name = item.querySelector('.guest-name').value;
+        if (name) {
+            const timing = item.querySelector('.guest-timing').value;
+            
+            let startRound = 1;
+            let endRound = numRounds;
+            
+            if (timing === 'late') {
+                startRound = 2;
+            } else if (timing === 'early') {
+                endRound = Math.max(1, numRounds - 1);
+            }
+            
+            participants.push({
+                name: name,
+                gender: item.querySelector('.guest-gender').value,
+                ntrp: item.querySelector('.guest-ntrp').value,
+                timing: timing,
+                start_round: startRound,
+                end_round: endRound,
+            });
+        }
+    });
+    
+    return participants;
+}
+
+// 대진표 생성
+async function generateMatches() {
+    const participants = collectParticipants();
+    
+    if (participants.length < 4) {
+        showToast('최소 4명의 참가자가 필요합니다', 'error');
+        return;
+    }
+    
+    showLoading();
+    
+    try {
+        const result = await fetchWithCSRF('/matchmaking/api/generate/', {
+            method: 'POST',
+            body: JSON.stringify({
+                participants: participants,
+                num_courts: parseInt(document.getElementById('numCourts').value),
+                num_rounds: parseInt(document.getElementById('numRounds').value),
+                date: new Date().toISOString().split('T')[0],
+            }),
+        });
+        
+        hideLoading();
+        
+        if (result.success) {
+            currentSessionId = result.session_id;
+            displaySchedule(result.schedule);
+            document.getElementById('matchResult').style.display = 'block';
+            document.getElementById('regenerateBtn').style.display = 'inline-flex';
+            showToast('대진표가 생성되었습니다! 🎾');
+            
+            // 결과로 스크롤
+            document.getElementById('matchResult').scrollIntoView({ behavior: 'smooth' });
+        } else {
+            showToast(result.error || '대진표 생성에 실패했습니다', 'error');
+        }
+    } catch (error) {
+        hideLoading();
+        showToast('오류가 발생했습니다', 'error');
+        console.error(error);
+    }
+}
+
+// 대진표 재생성
+async function regenerateMatches() {
+    if (!currentSessionId) {
+        showToast('먼저 대진표를 생성해주세요', 'error');
+        return;
+    }
+    
+    showLoading();
+    
+    try {
+        const result = await fetchWithCSRF('/matchmaking/api/regenerate/', {
+            method: 'POST',
+            body: JSON.stringify({
+                session_id: currentSessionId,
+                num_courts: parseInt(document.getElementById('numCourts').value),
+                num_rounds: parseInt(document.getElementById('numRounds').value),
+            }),
+        });
+        
+        hideLoading();
+        
+        if (result.success) {
+            displaySchedule(result.schedule);
+            showToast('새로운 대진표가 생성되었습니다! 🔄');
+        } else {
+            showToast(result.error || '대진표 재생성에 실패했습니다', 'error');
+        }
+    } catch (error) {
+        hideLoading();
+        showToast('오류가 발생했습니다', 'error');
+    }
+}
+
+// 대진표 표시
+function displaySchedule(schedule) {
+    currentSchedule = schedule; // 스케줄 저장
+    
+    // 카드 뷰 표시
+    const container = document.getElementById('matchSchedule');
+    container.innerHTML = '';
+    
+    schedule.forEach(round => {
+        let matchesHtml = round.matches.map(match => {
+            // 매치 타입에 따른 스타일 클래스
+            const typeClass = match.match_type ? `match-type-${match.match_type.type}` : '';
+            const typeLabel = match.match_type ? match.match_type.label : '';
+            const typeEmoji = match.match_type ? match.match_type.emoji : '';
+            
+            return `
+            <div class="match-item ${typeClass}">
+                <div class="match-badges">
+                    <div class="court-badge">코트 ${match.court}</div>
+                    <div class="match-type-badge ${typeClass}">${typeEmoji} ${typeLabel}</div>
+                </div>
+                <div class="match-teams">
+                    <div class="team">
+                        <div class="team-players">${match.team_a.join(' & ')}</div>
+                        <div class="team-ntrp">NTRP: ${match.team_a_ntrp.join(' + ')}</div>
+                    </div>
+                    <div class="vs-badge">VS</div>
+                    <div class="team">
+                        <div class="team-players">${match.team_b.join(' & ')}</div>
+                        <div class="team-ntrp">NTRP: ${match.team_b_ntrp.join(' + ')}</div>
+                    </div>
+                </div>
+            </div>
+        `}).join('');
+        
+        let restingHtml = '';
+        if (round.resting && round.resting.length > 0) {
+            restingHtml = `
+                <div class="resting-section">
+                    <strong>😴 휴식:</strong> ${round.resting.join(', ')}
+                </div>
+            `;
+        }
+        
+        const roundHtml = `
+            <div class="round-card">
+                <div class="round-header">라운드 ${round.round}</div>
+                <div class="match-list">
+                    ${matchesHtml}
+                </div>
+                ${restingHtml}
+            </div>
+        `;
+        
+        container.insertAdjacentHTML('beforeend', roundHtml);
+    });
+    
+    // 표 뷰도 생성
+    displayScheduleTable(schedule);
+    
+    // 게임 수 통계 표시
+    displayGameStats(schedule);
+}
+
+// 게임 수 통계 계산 및 표시
+function displayGameStats(schedule) {
+    const stats = {}; // {name: {total: 0, male: 0, female: 0, mixed: 0, rest: 0}}
+    
+    // 모든 참가자 초기화 (플레이한 사람 + 휴식한 사람)
+    schedule.forEach(round => {
+        // 플레이한 사람들
+        round.matches.forEach(match => {
+            const matchType = match.match_type ? match.match_type.type : 'mixed';
+            const allPlayers = [...match.team_a, ...match.team_b];
+            
+            allPlayers.forEach(playerName => {
+                if (!stats[playerName]) {
+                    stats[playerName] = { total: 0, male: 0, female: 0, mixed: 0, rest: 0 };
+                }
+                stats[playerName].total++;
+                stats[playerName][matchType]++;
+            });
+        });
+        
+        // 휴식한 사람들
+        if (round.resting && round.resting.length > 0) {
+            round.resting.forEach(playerName => {
+                if (!stats[playerName]) {
+                    stats[playerName] = { total: 0, male: 0, female: 0, mixed: 0, rest: 0 };
+                }
+                stats[playerName].rest++;
+            });
+        }
+    });
+    
+    // 테이블 생성
+    const tbody = document.getElementById('statsTableBody');
+    tbody.innerHTML = '';
+    
+    // 정렬 (전체 게임 수 내림차순)
+    const sortedPlayers = Object.entries(stats).sort((a, b) => b[1].total - a[1].total);
+    
+    sortedPlayers.forEach(([name, data]) => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td class="player-name-cell">${name}</td>
+            <td class="stats-cell total-cell"><strong>${data.total}</strong></td>
+            <td class="stats-cell male-cell">${data.male}</td>
+            <td class="stats-cell female-cell">${data.female}</td>
+            <td class="stats-cell mixed-cell">${data.mixed}</td>
+            <td class="stats-cell rest-cell">${data.rest}</td>
+        `;
+        tbody.appendChild(row);
+    });
+}
+
+// 표 형식 대진표 생성
+function displayScheduleTable(schedule) {
+    const tableContainer = document.getElementById('scheduleTableContainer');
+    
+    // 코트 수 계산
+    const numCourts = Math.max(...schedule.flatMap(r => r.matches.map(m => m.court)));
+    
+    // 날짜 (입력 필드에서 가져오기)
+    const dateInput = document.getElementById('matchDate').value;
+    let dateStr;
+    if (dateInput) {
+        const [year, month, day] = dateInput.split('-');
+        dateStr = `${year}년 ${parseInt(month)}월 ${parseInt(day)}일`;
+    } else {
+        const today = new Date();
+        dateStr = `${today.getFullYear()}년 ${today.getMonth() + 1}월 ${today.getDate()}일`;
+    }
+    
+    let tableHtml = `
+        <div class="schedule-table-header">
+            <div class="schedule-title">🎾 험블비 테니스 클럽 대진표</div>
+            <div class="schedule-date">${dateStr}</div>
+        </div>
+        <table class="schedule-table">
+            <thead>
+                <tr>
+                    <th class="round-col">라운드</th>
+    `;
+    
+    // 코트별 헤더
+    for (let i = 1; i <= numCourts; i++) {
+        tableHtml += `<th class="court-col">코트 ${i}</th>`;
+    }
+    tableHtml += `<th class="rest-col">휴식</th></tr></thead><tbody>`;
+    
+    // 각 라운드 행
+    schedule.forEach(round => {
+        tableHtml += `<tr><td class="round-cell"><strong>R${round.round}</strong></td>`;
+        
+        // 각 코트별 매치
+        for (let court = 1; court <= numCourts; court++) {
+            const match = round.matches.find(m => m.court === court);
+            if (match) {
+                const typeClass = match.match_type ? match.match_type.type : '';
+                const typeLabel = match.match_type ? match.match_type.label : '';
+                const typeEmoji = match.match_type ? match.match_type.emoji : '';
+                
+                tableHtml += `
+                    <td class="match-cell match-cell-${typeClass}">
+                        <div class="table-match-type">${typeEmoji} ${typeLabel}</div>
+                        <div class="table-team">${match.team_a.join(' & ')}</div>
+                        <div class="table-vs">VS</div>
+                        <div class="table-team">${match.team_b.join(' & ')}</div>
+                    </td>
+                `;
+            } else {
+                tableHtml += `<td class="match-cell empty-cell">-</td>`;
+            }
+        }
+        
+        // 휴식 멤버
+        const resting = round.resting && round.resting.length > 0 
+            ? round.resting.join(', ') 
+            : '-';
+        tableHtml += `<td class="rest-cell">${resting}</td></tr>`;
+    });
+    
+    tableHtml += `</tbody></table>`;
+    
+    // 운영 방식 안내
+    tableHtml += `
+        <div class="operation-guide">
+            <div class="guide-title">🎾 험블비 일요정모 운영 방식</div>
+            <div class="guide-content">
+                <p>1. 각 Set 사이 쉬는시간 3분 (Set 종료 후 다음 게임 Player 바로 나갈 수 있도록 준비)</p>
+                <p>2. Set 종료 시점은 둘 중 하나 충족시 종료 (6게임 승 or 게임시간 종료)</p>
+                <p>3. 게임 5:5 경우 게임시간 5분 초과 여유시 Tie Break / 5분 이하 1게임으로 진행</p>
+                <p>4. 듀스 X 노에드 진행</p>
+            </div>
+        </div>
+    `;
+    
+    tableContainer.innerHTML = tableHtml;
+}
+
+// 탭 전환 및 URL 파라미터 처리
+document.addEventListener('DOMContentLoaded', function() {
+    // 탭 클릭 이벤트
+    document.querySelectorAll('#matchResult .tab').forEach(tab => {
+        tab.addEventListener('click', function() {
+            // 탭 활성화
+            document.querySelectorAll('#matchResult .tab').forEach(t => t.classList.remove('active'));
+            this.classList.add('active');
+            
+            // 콘텐츠 전환
+            const targetId = this.dataset.tab;
+            document.querySelectorAll('#matchResult .tab-content').forEach(content => {
+                content.style.display = content.id === targetId ? 'block' : 'none';
+            });
+        });
+    });
+    
+    // URL 파라미터에서 선택할 멤버 가져오기 (일정에서 넘어온 경우)
+    const urlParams = new URLSearchParams(window.location.search);
+    const memberIdsParam = urlParams.get('members');
+    const eventDate = urlParams.get('date');
+    const eventTitle = urlParams.get('title');
+    
+    // 날짜 필드 초기화 (오늘 날짜 또는 URL에서 받은 날짜)
+    const dateInput = document.getElementById('matchDate');
+    if (eventDate) {
+        dateInput.value = eventDate;
+    } else {
+        dateInput.value = new Date().toISOString().split('T')[0];
+    }
+    
+    if (memberIdsParam) {
+        const memberIds = memberIdsParam.split(',').map(id => parseInt(id));
+        
+        // 1. 먼저 모든 기존 선택 초기화
+        document.querySelectorAll('.participant-card.selected').forEach(card => {
+            card.classList.remove('selected');
+            const timingSelect = card.querySelector('.timing-select');
+            if (timingSelect) {
+                timingSelect.style.display = 'none';
+                // 타이밍도 기본값으로 리셋
+                const timingValue = timingSelect.querySelector('.timing-value');
+                if (timingValue) timingValue.value = 'full';
+                timingSelect.querySelectorAll('.timing-btn').forEach(btn => {
+                    btn.classList.toggle('active', btn.dataset.value === 'full');
+                });
+            }
+        });
+        
+        // 게스트도 초기화
+        document.getElementById('guestList').innerHTML = '';
+        
+        // 2. URL에 있는 멤버만 새로 선택
+        document.querySelectorAll('.participant-card[data-member-id]').forEach(card => {
+            const memberId = parseInt(card.dataset.memberId);
+            if (memberIds.includes(memberId)) {
+                card.classList.add('selected');
+                const timingSelect = card.querySelector('.timing-select');
+                if (timingSelect) {
+                    timingSelect.style.display = 'block';
+                }
+            }
+        });
+        
+        // 3. 참가자 수 업데이트 & 저장
+        updateParticipantCount();
+        saveToStorage();
+        
+        // 일정 정보 표시
+        if (eventDate || eventTitle) {
+            const infoText = eventTitle ? `📅 ${eventTitle} (${eventDate})` : `📅 ${eventDate}`;
+            showToast(`${infoText} 참석자가 선택되었습니다`, 'success');
+        }
+    }
+});
+
+// 이미지 다운로드
+async function downloadTableAsImage() {
+    const tableWrapper = document.getElementById('scheduleTableContainer');
+    
+    if (!tableWrapper || !currentSchedule) {
+        showToast('대진표가 없습니다', 'error');
+        return;
+    }
+    
+    showLoading();
+    
+    try {
+        // 이미지 저장을 위해 임시로 너비 고정 (800px)
+        const originalStyle = tableWrapper.style.cssText;
+        tableWrapper.style.cssText = 'width: 800px !important; min-width: 800px !important; max-width: 800px !important;';
+        
+        // 리플로우 대기
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        const canvas = await html2canvas(tableWrapper, {
+            backgroundColor: '#ffffff',
+            scale: 2, // 고해상도
+            useCORS: true,
+            logging: false,
+            width: 800,
+        });
+        
+        // 원래 스타일 복원
+        tableWrapper.style.cssText = originalStyle;
+        
+        // 다운로드 링크 생성
+        const link = document.createElement('a');
+        const today = new Date();
+        const filename = `대진표_${today.getFullYear()}${(today.getMonth()+1).toString().padStart(2,'0')}${today.getDate().toString().padStart(2,'0')}.png`;
+        
+        link.download = filename;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+        
+        hideLoading();
+        showToast('이미지가 다운로드되었습니다! 📥');
+    } catch (error) {
+        hideLoading();
+        showToast('이미지 생성에 실패했습니다', 'error');
+        console.error(error);
+    }
+}
+
+// ===== 대진표 수정 기능 =====
+
+function openEditModal() {
+    if (!currentSchedule || currentSchedule.length === 0) {
+        showToast('수정할 대진표가 없습니다', 'error');
+        return;
+    }
+    
+    // 참가자 목록 가져오기
+    const participants = [];
+    document.querySelectorAll('.participant-card.selected').forEach(card => {
+        participants.push({
+            id: card.dataset.memberId,
+            name: card.dataset.name,
+            gender: card.dataset.gender
+        });
+    });
+    document.querySelectorAll('.guest-item').forEach(item => {
+        const name = item.querySelector('.guest-name').value;
+        if (name) {
+            participants.push({
+                id: 'guest_' + name,
+                name: name,
+                gender: item.querySelector('.guest-gender').value
+            });
+        }
+    });
+    
+    // 모달 내용 생성
+    let modalContent = '<div class="edit-schedule-content">';
+    
+    currentSchedule.forEach((round, roundIdx) => {
+        modalContent += `<div class="edit-round">
+            <h4>🎾 라운드 ${round.round}</h4>
+            <div class="edit-matches">`;
+        
+        round.matches.forEach((match, matchIdx) => {
+            const teamA = match.team_a || [];
+            const teamB = match.team_b || [];
+            
+            modalContent += `
+            <div class="edit-match" data-round="${roundIdx}" data-match="${matchIdx}">
+                <div class="edit-match-header">코트 ${match.court}</div>
+                <div class="edit-teams">
+                    <div class="edit-team">
+                        <select class="form-control edit-player" data-team="a" data-pos="0">
+                            <option value="">선수 선택</option>
+                            ${participants.map(p => `<option value="${p.name}" ${teamA[0] === p.name ? 'selected' : ''}>${p.name} (${p.gender === 'M' ? '남' : '여'})</option>`).join('')}
+                        </select>
+                        <select class="form-control edit-player" data-team="a" data-pos="1">
+                            <option value="">선수 선택</option>
+                            ${participants.map(p => `<option value="${p.name}" ${teamA[1] === p.name ? 'selected' : ''}>${p.name} (${p.gender === 'M' ? '남' : '여'})</option>`).join('')}
+                        </select>
+                    </div>
+                    <div class="edit-vs">VS</div>
+                    <div class="edit-team">
+                        <select class="form-control edit-player" data-team="b" data-pos="0">
+                            <option value="">선수 선택</option>
+                            ${participants.map(p => `<option value="${p.name}" ${teamB[0] === p.name ? 'selected' : ''}>${p.name} (${p.gender === 'M' ? '남' : '여'})</option>`).join('')}
+                        </select>
+                        <select class="form-control edit-player" data-team="b" data-pos="1">
+                            <option value="">선수 선택</option>
+                            ${participants.map(p => `<option value="${p.name}" ${teamB[1] === p.name ? 'selected' : ''}>${p.name} (${p.gender === 'M' ? '남' : '여'})</option>`).join('')}
+                        </select>
+                    </div>
+                </div>
+            </div>`;
+        });
+        
+        modalContent += '</div></div>';
+    });
+    
+    modalContent += '</div>';
+    
+    // 모달 표시
+    document.getElementById('editModalBody').innerHTML = modalContent;
+    document.getElementById('editScheduleModal').style.display = 'flex';
+}
+
+function closeEditModal() {
+    document.getElementById('editScheduleModal').style.display = 'none';
+}
+
+function saveScheduleEdits() {
+    // 수정된 내용을 currentSchedule에 반영
+    document.querySelectorAll('.edit-match').forEach(matchEl => {
+        const roundIdx = parseInt(matchEl.dataset.round);
+        const matchIdx = parseInt(matchEl.dataset.match);
+        
+        const teamA = [
+            matchEl.querySelector('[data-team="a"][data-pos="0"]').value,
+            matchEl.querySelector('[data-team="a"][data-pos="1"]').value
+        ].filter(v => v);
+        
+        const teamB = [
+            matchEl.querySelector('[data-team="b"][data-pos="0"]').value,
+            matchEl.querySelector('[data-team="b"][data-pos="1"]').value
+        ].filter(v => v);
+        
+        if (currentSchedule[roundIdx] && currentSchedule[roundIdx].matches[matchIdx]) {
+            currentSchedule[roundIdx].matches[matchIdx].team_a = teamA;
+            currentSchedule[roundIdx].matches[matchIdx].team_b = teamB;
+            
+            // 매치 타입 재계산
+            const genders = [];
+            [...teamA, ...teamB].forEach(name => {
+                const card = document.querySelector(`.participant-card[data-name="${name}"]`);
+                if (card) {
+                    genders.push(card.dataset.gender);
+                } else {
+                    // 게스트인 경우
+                    document.querySelectorAll('.guest-item').forEach(item => {
+                        if (item.querySelector('.guest-name').value === name) {
+                            genders.push(item.querySelector('.guest-gender').value);
+                        }
+                    });
+                }
+            });
+            
+            const maleCount = genders.filter(g => g === 'M').length;
+            const femaleCount = genders.filter(g => g === 'F').length;
+            
+            let matchType = { type: 'mixed', label: '혼복', emoji: '👫' };
+            if (maleCount === 4) matchType = { type: 'male', label: '남복', emoji: '👬' };
+            else if (femaleCount === 4) matchType = { type: 'female', label: '여복', emoji: '👭' };
+            
+            currentSchedule[roundIdx].matches[matchIdx].match_type = matchType;
+        }
+    });
+    
+    // 휴식 인원 재계산
+    currentSchedule.forEach(round => {
+        const playingNames = new Set();
+        round.matches.forEach(match => {
+            [...(match.team_a || []), ...(match.team_b || [])].forEach(name => playingNames.add(name));
+        });
+        
+        const allNames = [];
+        document.querySelectorAll('.participant-card.selected').forEach(card => {
+            allNames.push(card.dataset.name);
+        });
+        document.querySelectorAll('.guest-item').forEach(item => {
+            const name = item.querySelector('.guest-name').value;
+            if (name) allNames.push(name);
+        });
+        
+        round.resting = allNames.filter(name => !playingNames.has(name));
+    });
+    
+    // 대진표 다시 표시
+    displaySchedule(currentSchedule);
+    
+    closeEditModal();
+    showToast('대진표가 수정되었습니다! ✏️', 'success');
+}
+
+// 모달 외부 클릭 시 닫기
+document.addEventListener('click', function(e) {
+    const modal = document.getElementById('editScheduleModal');
+    if (e.target === modal) {
+        closeEditModal();
+    }
+});
+</script>
+
+<!-- 대진표 수정 모달 -->
+<div id="editScheduleModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 9999; justify-content: center; align-items: center;">
+    <div style="background: white; border-radius: 16px; max-width: 700px; width: 90%; max-height: 80vh; overflow-y: auto; margin: auto;">
+        <div class="modal-header" style="padding: 20px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
+            <h3 style="margin: 0;">✏️ 대진표 수정</h3>
+            <button onclick="closeEditModal()" style="background: none; border: none; font-size: 24px; cursor: pointer; color: #64748b;">&times;</button>
+        </div>
+        <div id="editModalBody" style="padding: 20px;">
+            <!-- 동적으로 생성됨 -->
+        </div>
+        <div style="padding: 20px; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end; gap: 12px;">
+            <button class="btn btn-secondary" onclick="closeEditModal()">취소</button>
+            <button class="btn btn-primary" onclick="saveScheduleEdits()">💾 저장</button>
+        </div>
+    </div>
+</div>
+
+<style>
+.edit-schedule-content {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.edit-round h4 {
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid #e2e8f0;
+    color: #1e293b;
+}
+
+.edit-matches {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.edit-match {
+    background: #f8fafc;
+    border-radius: 12px;
+    padding: 16px;
+    border: 1px solid #e2e8f0;
+}
+
+.edit-match-header {
+    font-weight: 600;
+    color: #64748b;
+    margin-bottom: 12px;
+    font-size: 14px;
+}
+
+.edit-teams {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.edit-team {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.edit-team select {
+    font-size: 14px;
+    padding: 8px 12px;
+}
+
+.edit-vs {
+    font-weight: 700;
+    color: #94a3b8;
+    padding: 0 8px;
+}
+
+@media (max-width: 600px) {
+    .edit-teams {
+        flex-direction: column;
+    }
+    
+    .edit-vs {
+        padding: 8px 0;
+    }
+}
+</style>
+{% endblock %}
+

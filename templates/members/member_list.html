@@ -1,0 +1,492 @@
+{% extends 'base.html' %}
+
+{% block title %}멤버 관리 - 테니스 클럽{% endblock %}
+
+{% block page_title %}멤버 관리{% endblock %}
+
+{% block header_actions %}
+<button class="btn btn-primary" onclick="openModal('addMemberModal')">
+    <span>➕</span> 멤버 추가
+</button>
+{% endblock %}
+
+{% block content %}
+<div class="tabs">
+    <button class="tab active" data-tab="active-members">활동중 ({{ active_members|length }})</button>
+    <button class="tab" data-tab="inactive-members">휴회중 ({{ inactive_members|length }})</button>
+</div>
+
+<!-- 활동중 멤버 -->
+<div id="active-members" class="tab-content">
+    {% if active_members %}
+    <div class="member-grid">
+        {% for member in active_members %}
+        <div class="member-card" data-member-id="{{ member.id }}" onclick="viewMemberDetail({{ member.id }})" style="cursor: pointer;">
+            <div class="member-card-header">
+                <div class="member-avatar-wrapper">
+                    <div class="member-avatar {% if member.gender == 'M' %}male{% else %}female{% endif %}">
+                        {% if member.gender == 'M' %}🙋‍♂️{% else %}🙋‍♀️{% endif %}
+                    </div>
+                    {% if member.is_admin %}<span class="admin-badge">👑</span>{% endif %}
+                </div>
+                <div>
+                    <div class="member-name">{{ member.name }}</div>
+                    <div class="member-status">
+                        <span class="badge badge-success">활동중</span>
+                    </div>
+                </div>
+            </div>
+            <div class="member-details">
+                <div class="member-detail-item">
+                    <div class="member-detail-label">성별</div>
+                    <div class="member-detail-value">{{ member.get_gender_display }}</div>
+                </div>
+                <div class="member-detail-item">
+                    <div class="member-detail-label">구력</div>
+                    <div class="member-detail-value">{{ member.experience_years }}년</div>
+                </div>
+                <div class="member-detail-item">
+                    <div class="member-detail-label">NTRP</div>
+                    <div class="member-detail-value">{{ member.ntrp }}</div>
+                </div>
+                <div class="member-detail-item">
+                    <div class="member-detail-label">연락처</div>
+                    <div class="member-detail-value">{{ member.phone|default:'-' }}</div>
+                </div>
+            </div>
+            <div class="member-card-actions">
+                <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); editMember({{ member.id }}, '{{ member.name }}', '{{ member.gender }}', {{ member.experience_years }}, '{{ member.ntrp }}', '{{ member.status }}', '{{ member.phone }}', {{ member.is_admin|yesno:'true,false' }})">
+                    ✏️ 수정
+                </button>
+                <button class="btn btn-danger btn-sm" onclick="event.stopPropagation(); deleteMember({{ member.id }}, '{{ member.name }}')">
+                    🗑️ 삭제
+                </button>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <div class="empty-state-icon">👥</div>
+        <div class="empty-state-text">활동중인 멤버가 없습니다</div>
+        <div class="empty-state-subtext">멤버 추가 버튼을 눌러 새 멤버를 추가해보세요</div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- 휴회중 멤버 -->
+<div id="inactive-members" class="tab-content" style="display: none;">
+    {% if inactive_members %}
+    <div class="member-grid">
+        {% for member in inactive_members %}
+        <div class="member-card" data-member-id="{{ member.id }}" onclick="viewMemberDetail({{ member.id }})" style="cursor: pointer;">
+            <div class="member-card-header">
+                <div class="member-avatar-wrapper">
+                    <div class="member-avatar {% if member.gender == 'M' %}male{% else %}female{% endif %}" style="opacity: 0.6;">
+                        {% if member.gender == 'M' %}🙋‍♂️{% else %}🙋‍♀️{% endif %}
+                    </div>
+                    {% if member.is_admin %}<span class="admin-badge">👑</span>{% endif %}
+                </div>
+                <div>
+                    <div class="member-name">{{ member.name }}</div>
+                    <div class="member-status">
+                        <span class="badge badge-warning">휴회중</span>
+                    </div>
+                </div>
+            </div>
+            <div class="member-details">
+                <div class="member-detail-item">
+                    <div class="member-detail-label">성별</div>
+                    <div class="member-detail-value">{{ member.get_gender_display }}</div>
+                </div>
+                <div class="member-detail-item">
+                    <div class="member-detail-label">구력</div>
+                    <div class="member-detail-value">{{ member.experience_years }}년</div>
+                </div>
+                <div class="member-detail-item">
+                    <div class="member-detail-label">NTRP</div>
+                    <div class="member-detail-value">{{ member.ntrp }}</div>
+                </div>
+                <div class="member-detail-item">
+                    <div class="member-detail-label">연락처</div>
+                    <div class="member-detail-value">{{ member.phone|default:'-' }}</div>
+                </div>
+            </div>
+            <div class="member-card-actions">
+                <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); editMember({{ member.id }}, '{{ member.name }}', '{{ member.gender }}', {{ member.experience_years }}, '{{ member.ntrp }}', '{{ member.status }}', '{{ member.phone }}', {{ member.is_admin|yesno:'true,false' }})">
+                    ✏️ 수정
+                </button>
+                <button class="btn btn-danger btn-sm" onclick="event.stopPropagation(); deleteMember({{ member.id }}, '{{ member.name }}')">
+                    🗑️ 삭제
+                </button>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <div class="empty-state-icon">😴</div>
+        <div class="empty-state-text">휴회중인 멤버가 없습니다</div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- 멤버 추가 모달 -->
+<div id="addMemberModal" class="modal-overlay">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 class="modal-title">🎾 새 멤버 추가</h3>
+            <button class="modal-close" onclick="closeModal('addMemberModal')">×</button>
+        </div>
+        <div class="modal-body">
+            <form id="addMemberForm">
+                <div class="form-group">
+                    <label class="form-label">이름 *</label>
+                    <input type="text" name="name" class="form-control" required placeholder="멤버 이름">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">성별 *</label>
+                    <select name="gender" class="form-control" required>
+                        {% for value, label in gender_choices %}
+                        <option value="{{ value }}">{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">구력 (년)</label>
+                    <input type="number" name="experience_years" class="form-control" value="0" min="0">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">NTRP</label>
+                    <select name="ntrp" class="form-control">
+                        {% for value, label in ntrp_choices %}
+                        <option value="{{ value }}" {% if value == '2.5' %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">상태</label>
+                    <select name="status" class="form-control">
+                        {% for value, label in status_choices %}
+                        <option value="{{ value }}">{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">연락처</label>
+                    <input type="text" name="phone" class="form-control" placeholder="010-0000-0000">
+                </div>
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" name="is_admin">
+                        <span>👑 운영진으로 지정</span>
+                    </label>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('addMemberModal')">취소</button>
+            <button class="btn btn-primary" onclick="submitAddMember()">추가하기</button>
+        </div>
+    </div>
+</div>
+
+<!-- 멤버 수정 모달 -->
+<div id="editMemberModal" class="modal-overlay">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 class="modal-title">✏️ 멤버 정보 수정</h3>
+            <button class="modal-close" onclick="closeModal('editMemberModal')">×</button>
+        </div>
+        <div class="modal-body">
+            <form id="editMemberForm">
+                <input type="hidden" name="member_id" id="editMemberId">
+                <div class="form-group">
+                    <label class="form-label">이름 *</label>
+                    <input type="text" name="name" id="editName" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">성별 *</label>
+                    <select name="gender" id="editGender" class="form-control" required>
+                        {% for value, label in gender_choices %}
+                        <option value="{{ value }}">{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">구력 (년)</label>
+                    <input type="number" name="experience_years" id="editExperience" class="form-control" min="0">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">NTRP</label>
+                    <select name="ntrp" id="editNtrp" class="form-control">
+                        {% for value, label in ntrp_choices %}
+                        <option value="{{ value }}">{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">상태</label>
+                    <select name="status" id="editStatus" class="form-control">
+                        {% for value, label in status_choices %}
+                        <option value="{{ value }}">{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">연락처</label>
+                    <input type="text" name="phone" id="editPhone" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" name="is_admin" id="editIsAdmin">
+                        <span>👑 운영진으로 지정</span>
+                    </label>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('editMemberModal')">취소</button>
+            <button class="btn btn-primary" onclick="submitEditMember()">저장하기</button>
+        </div>
+    </div>
+</div>
+
+<!-- 멤버 상세/통계 모달 -->
+<div id="memberDetailModal" class="modal-overlay">
+    <div class="modal" style="max-width: 600px;">
+        <div class="modal-header">
+            <h3 class="modal-title" id="memberDetailTitle">📊 멤버 상세 정보</h3>
+            <button class="modal-close" onclick="closeModal('memberDetailModal')">×</button>
+        </div>
+        <div class="modal-body" id="memberDetailContent">
+            <!-- 동적으로 채워짐 -->
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('memberDetailModal')">닫기</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Tab switching
+document.querySelectorAll('.tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        
+        const targetId = tab.dataset.tab;
+        document.querySelectorAll('.tab-content').forEach(content => {
+            content.style.display = content.id === targetId ? 'block' : 'none';
+        });
+    });
+});
+
+// View member detail with stats
+async function viewMemberDetail(memberId) {
+    try {
+        const response = await fetch(`/members/api/detail/${memberId}/`);
+        const member = await response.json();
+        
+        document.getElementById('memberDetailTitle').textContent = `📊 ${member.name} 님의 정보`;
+        
+        // 참석률 색상 결정
+        let rateColor = '#28a745'; // 녹색
+        if (member.stats.attendance_rate < 50) {
+            rateColor = '#dc3545'; // 빨간색
+        } else if (member.stats.attendance_rate < 70) {
+            rateColor = '#ffc107'; // 노란색
+        }
+        
+        // 월별 통계 HTML
+        let monthlyStatsHtml = '';
+        if (member.stats.monthly_stats && member.stats.monthly_stats.length > 0) {
+            monthlyStatsHtml = member.stats.monthly_stats.map(m => `
+                <div class="monthly-stat-item">
+                    <span class="monthly-stat-month">${m.month}</span>
+                    <div class="monthly-stat-bar-container">
+                        <div class="monthly-stat-bar" style="width: ${m.rate}%; background-color: ${m.rate >= 70 ? '#28a745' : m.rate >= 50 ? '#ffc107' : '#dc3545'};"></div>
+                    </div>
+                    <span class="monthly-stat-value">${m.attended}/${m.total} (${m.rate}%)</span>
+                </div>
+            `).join('');
+        }
+        
+        // 최근 참석 일정 HTML
+        let recentEventsHtml = '<span style="color: #888;">참석한 일정이 없습니다</span>';
+        if (member.stats.recent_events && member.stats.recent_events.length > 0) {
+            recentEventsHtml = member.stats.recent_events.map(e => `
+                <div class="recent-event-item">
+                    <span class="recent-event-date">${e.date}</span>
+                    <span class="recent-event-title">${e.title}</span>
+                </div>
+            `).join('');
+        }
+        
+        document.getElementById('memberDetailContent').innerHTML = `
+            <!-- 기본 정보 -->
+            <div class="member-detail-section">
+                <h4 class="section-title">👤 기본 정보</h4>
+                <div class="member-details" style="grid-template-columns: repeat(2, 1fr);">
+                    <div class="member-detail-item">
+                        <div class="member-detail-label">성별</div>
+                        <div class="member-detail-value">${member.gender_display}</div>
+                    </div>
+                    <div class="member-detail-item">
+                        <div class="member-detail-label">구력</div>
+                        <div class="member-detail-value">${member.experience_years}년</div>
+                    </div>
+                    <div class="member-detail-item">
+                        <div class="member-detail-label">NTRP</div>
+                        <div class="member-detail-value">${member.ntrp}</div>
+                    </div>
+                    <div class="member-detail-item">
+                        <div class="member-detail-label">상태</div>
+                        <div class="member-detail-value">${member.status_display}</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 참석률 통계 -->
+            <div class="member-detail-section" style="margin-top: 20px;">
+                <h4 class="section-title">📈 참석률 통계</h4>
+                <div class="attendance-stats">
+                    <div class="attendance-main">
+                        <div class="attendance-rate-circle" style="border-color: ${rateColor};">
+                            <span class="rate-number" style="color: ${rateColor};">${member.stats.attendance_rate}%</span>
+                            <span class="rate-label">참석률</span>
+                        </div>
+                        <div class="attendance-details">
+                            <div class="stat-item">
+                                <span class="stat-label">전체 일정</span>
+                                <span class="stat-value">${member.stats.total_events}회</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">참석한 일정</span>
+                                <span class="stat-value">${member.stats.attended_count}회</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">연속 참석</span>
+                                <span class="stat-value">${member.stats.consecutive_count}회 🔥</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 월별 참석률 -->
+            <div class="member-detail-section" style="margin-top: 20px;">
+                <h4 class="section-title">📅 최근 3개월 참석률</h4>
+                <div class="monthly-stats">
+                    ${monthlyStatsHtml || '<span style="color: #888;">데이터가 없습니다</span>'}
+                </div>
+            </div>
+            
+            <!-- 최근 참석 일정 -->
+            <div class="member-detail-section" style="margin-top: 20px;">
+                <h4 class="section-title">🎾 최근 참석한 일정</h4>
+                <div class="recent-events">
+                    ${recentEventsHtml}
+                </div>
+            </div>
+        `;
+        
+        openModal('memberDetailModal');
+    } catch (error) {
+        console.error('Error:', error);
+        showToast('멤버 정보를 불러올 수 없습니다', 'error');
+    }
+}
+
+// Add member
+async function submitAddMember() {
+    const form = document.getElementById('addMemberForm');
+    const formData = new FormData(form);
+    const data = Object.fromEntries(formData.entries());
+    // 체크박스 처리
+    data.is_admin = form.querySelector('input[name="is_admin"]').checked;
+    
+    try {
+        const result = await fetchWithCSRF('/members/api/create/', {
+            method: 'POST',
+            body: JSON.stringify(data),
+        });
+        
+        if (result.success) {
+            showToast('멤버가 추가되었습니다! 🎉');
+            closeModal('addMemberModal');
+            location.reload();
+        } else {
+            showToast(result.error || '오류가 발생했습니다', 'error');
+        }
+    } catch (error) {
+        showToast('오류가 발생했습니다', 'error');
+    }
+}
+
+// Edit member
+function editMember(id, name, gender, experience, ntrp, status, phone, isAdmin) {
+    document.getElementById('editMemberId').value = id;
+    document.getElementById('editName').value = name;
+    document.getElementById('editGender').value = gender;
+    document.getElementById('editExperience').value = experience;
+    document.getElementById('editNtrp').value = ntrp;
+    document.getElementById('editStatus').value = status;
+    document.getElementById('editPhone').value = phone;
+    document.getElementById('editIsAdmin').checked = isAdmin;
+    openModal('editMemberModal');
+}
+
+async function submitEditMember() {
+    const form = document.getElementById('editMemberForm');
+    const formData = new FormData(form);
+    const data = Object.fromEntries(formData.entries());
+    const memberId = data.member_id;
+    delete data.member_id;
+    // 체크박스 처리
+    data.is_admin = document.getElementById('editIsAdmin').checked;
+    
+    try {
+        const result = await fetchWithCSRF(`/members/api/update/${memberId}/`, {
+            method: 'POST',
+            body: JSON.stringify(data),
+        });
+        
+        if (result.success) {
+            showToast('멤버 정보가 수정되었습니다! ✨');
+            closeModal('editMemberModal');
+            location.reload();
+        } else {
+            showToast(result.error || '오류가 발생했습니다', 'error');
+        }
+    } catch (error) {
+        showToast('오류가 발생했습니다', 'error');
+    }
+}
+
+// Delete member
+async function deleteMember(id, name) {
+    if (!confirm(`정말 "${name}" 멤버를 삭제하시겠습니까?`)) {
+        return;
+    }
+    
+    try {
+        const result = await fetchWithCSRF(`/members/api/delete/${id}/`, {
+            method: 'POST',
+        });
+        
+        if (result.success) {
+            showToast('멤버가 삭제되었습니다');
+            location.reload();
+        } else {
+            showToast(result.error || '오류가 발생했습니다', 'error');
+        }
+    } catch (error) {
+        showToast('오류가 발생했습니다', 'error');
+    }
+}
+</script>
+{% endblock %}
+

@@ -1,0 +1,600 @@
+{% extends 'base.html' %}
+
+{% block title %}HumbleB 테니스 클럽{% endblock %}
+
+{% block page_title %}{% endblock %}
+
+{% block content %}
+<!-- 히어로 섹션 -->
+<div class="home-hero">
+    <div class="hero-content">
+        <div class="hero-logo">🎾</div>
+        <h1 class="hero-title">HumbleB</h1>
+        <p class="hero-subtitle">테니스 클럽</p>
+    </div>
+</div>
+
+<!-- 다음 일정 카드 -->
+{% if next_event %}
+<a href="/schedule/?event={{ next_event.id }}" class="next-event-card">
+    <div class="next-event-left">
+        <div class="next-event-badge">🎾 다음 정모</div>
+        <div class="next-event-date-box">
+            <span class="date-month">{{ next_event.date|date:"n" }}월</span>
+            <span class="date-day">{{ next_event.date|date:"j" }}</span>
+            <span class="date-weekday">{{ next_event.date|date:"l" }}</span>
+        </div>
+    </div>
+    <div class="next-event-right">
+        <h3 class="next-event-title">{{ next_event.title }}</h3>
+        <div class="next-event-meta">
+            <div class="meta-item">
+                <span class="meta-icon">🕐</span>
+                <span>{{ next_event.start_time|time:"H:i" }} - {{ next_event.end_time|time:"H:i" }}</span>
+            </div>
+            <div class="meta-item">
+                <span class="meta-icon">📍</span>
+                <span>{{ next_event.location }}</span>
+            </div>
+        </div>
+        <div class="next-event-footer">
+            <div class="attendees-badge">
+                <span>👥</span>
+                <span>{{ next_event_attendees }}명 참석</span>
+            </div>
+            <span class="view-detail">상세보기 →</span>
+        </div>
+    </div>
+</a>
+{% else %}
+<div class="no-event-card">
+    <div class="no-event-icon">📅</div>
+    <p>예정된 일정이 없습니다</p>
+    <a href="/schedule/" class="btn btn-primary">일정 추가하기</a>
+</div>
+{% endif %}
+
+<!-- 빠른 액션 -->
+<div class="quick-actions">
+    <a href="/schedule/" class="action-card">
+        <div class="action-icon">📅</div>
+        <div class="action-label">일정</div>
+    </a>
+    <a href="/matchmaking/" class="action-card">
+        <div class="action-icon">🎯</div>
+        <div class="action-label">대진표</div>
+    </a>
+    <a href="/members/" class="action-card">
+        <div class="action-icon">👥</div>
+        <div class="action-label">멤버</div>
+    </a>
+</div>
+
+<!-- 통계 카드 -->
+<div class="stats-cards">
+    <div class="stat-card">
+        <div class="stat-icon">👥</div>
+        <div class="stat-content">
+            <div class="stat-value">{{ total_members }}</div>
+            <div class="stat-label">활성 멤버</div>
+        </div>
+        <div class="stat-detail">
+            <span class="male">♂ {{ male_members }}</span>
+            <span class="female">♀ {{ female_members }}</span>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon">📅</div>
+        <div class="stat-content">
+            <div class="stat-value">{{ this_month_events }}</div>
+            <div class="stat-label">이번 달 일정</div>
+        </div>
+    </div>
+</div>
+
+<!-- 다가오는 일정 목록 -->
+{% if upcoming_events %}
+<div class="upcoming-section">
+    <h3 class="section-title">📆 다가오는 일정</h3>
+    <div class="upcoming-list">
+        {% for event in upcoming_events %}
+        <a href="/schedule/?event={{ event.id }}" class="upcoming-item">
+            <div class="upcoming-date">
+                <span class="u-month">{{ event.date|date:"n월" }}</span>
+                <span class="u-day">{{ event.date|date:"j" }}</span>
+            </div>
+            <div class="upcoming-info">
+                <div class="upcoming-title">{{ event.title }}</div>
+                <div class="upcoming-meta">
+                    {{ event.start_time|time:"H:i" }} · {{ event.location }}
+                </div>
+            </div>
+            <div class="upcoming-arrow">→</div>
+        </a>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<style>
+/* 히어로 섹션 */
+.home-hero {
+    text-align: center;
+    padding: 40px 20px;
+    background: linear-gradient(135deg, #a7f3d0 0%, #6ee7b7 50%, #34d399 100%);
+    border-radius: 20px;
+    margin-bottom: 24px;
+    position: relative;
+    overflow: hidden;
+}
+
+.home-hero::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle, rgba(255,255,255,0.3) 0%, transparent 60%);
+    animation: pulse 4s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { transform: scale(1); opacity: 0.5; }
+    50% { transform: scale(1.1); opacity: 0.8; }
+}
+
+.hero-content {
+    position: relative;
+    z-index: 1;
+}
+
+.hero-logo {
+    font-size: 64px;
+    margin-bottom: 12px;
+    filter: drop-shadow(0 4px 8px rgba(0,0,0,0.1));
+}
+
+.hero-title {
+    font-size: 36px;
+    font-weight: 800;
+    color: #065f46;
+    margin: 0;
+    letter-spacing: -1px;
+}
+
+.hero-subtitle {
+    font-size: 16px;
+    color: #047857;
+    margin: 8px 0 0;
+    font-weight: 500;
+}
+
+/* 다음 일정 카드 */
+.next-event-card {
+    display: flex;
+    gap: 0;
+    background: white;
+    border-radius: 20px;
+    margin-bottom: 24px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+    border: 1px solid var(--border);
+    overflow: hidden;
+    text-decoration: none;
+    transition: all 0.3s ease;
+}
+
+.next-event-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 40px rgba(0,0,0,0.12);
+}
+
+.next-event-left {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px 24px;
+    background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+    border-right: 1px solid #bbf7d0;
+    min-width: 120px;
+}
+
+.next-event-badge {
+    font-size: 11px;
+    font-weight: 700;
+    color: #15803d;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 12px;
+}
+
+.next-event-date-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+}
+
+.next-event-date-box .date-month {
+    font-size: 13px;
+    font-weight: 600;
+    color: #16a34a;
+}
+
+.next-event-date-box .date-day {
+    font-size: 42px;
+    font-weight: 800;
+    color: #15803d;
+    line-height: 1;
+    margin: 4px 0 16px;
+}
+
+.next-event-date-box .date-weekday {
+    font-size: 12px;
+    font-weight: 500;
+    color: #22c55e;
+    padding: 5px 14px;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+
+.next-event-right {
+    flex: 1;
+    padding: 20px 24px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.next-event-title {
+    font-size: 20px;
+    font-weight: 700;
+    color: #1e293b;
+    margin: 0 0 12px;
+}
+
+.next-event-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 14px;
+}
+
+.meta-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    color: #64748b;
+}
+
+.meta-icon {
+    font-size: 14px;
+}
+
+.next-event-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-top: 14px;
+    border-top: 1px solid #e2e8f0;
+}
+
+.attendees-badge {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #0d9488;
+    padding: 6px 12px;
+    background: linear-gradient(135deg, #f0fdfa 0%, #ccfbf1 100%);
+    border-radius: 20px;
+}
+
+.view-detail {
+    font-size: 13px;
+    font-weight: 600;
+    color: #64748b;
+    transition: color 0.2s;
+}
+
+.next-event-card:hover .view-detail {
+    color: #15803d;
+}
+
+/* 일정 없음 */
+.no-event-card {
+    text-align: center;
+    padding: 40px 20px;
+    background: var(--surface);
+    border-radius: 16px;
+    margin-bottom: 24px;
+}
+
+.no-event-icon {
+    font-size: 48px;
+    margin-bottom: 12px;
+}
+
+.no-event-card p {
+    color: var(--text-secondary);
+    margin-bottom: 16px;
+}
+
+/* 빠른 액션 */
+.quick-actions {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-bottom: 24px;
+}
+
+.action-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 20px 16px;
+    background: white;
+    border-radius: 16px;
+    text-decoration: none;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+    border: 1px solid var(--border);
+    transition: all 0.2s;
+}
+
+.action-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.12);
+    border-color: var(--primary);
+}
+
+.action-icon {
+    font-size: 32px;
+}
+
+.action-label {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+}
+
+/* 통계 카드 */
+.stats-cards {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    margin-bottom: 24px;
+}
+
+.stat-card {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 16px;
+    background: white;
+    border-radius: 14px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+    border: 1px solid var(--border);
+}
+
+.stat-icon {
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+    border-radius: 12px;
+}
+
+.stat-content {
+    flex: 1;
+}
+
+.stat-value {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--text);
+}
+
+.stat-label {
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+.stat-detail {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.stat-detail .male {
+    color: #2563eb;
+}
+
+.stat-detail .female {
+    color: #db2777;
+}
+
+/* 다가오는 일정 */
+.upcoming-section {
+    margin-bottom: 24px;
+}
+
+.section-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 16px;
+}
+
+.upcoming-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.upcoming-item {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 16px;
+    background: white;
+    border-radius: 12px;
+    text-decoration: none;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    border: 1px solid var(--border);
+    transition: all 0.2s;
+    color: inherit;
+}
+
+.upcoming-item:hover {
+    background: #f8fafc;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+
+.upcoming-date {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 50px;
+    padding: 8px;
+    background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+    border-radius: 8px;
+}
+
+.upcoming-date .u-month {
+    font-size: 10px;
+    color: #64748b !important;
+    font-weight: 500;
+}
+
+.upcoming-date .u-day {
+    font-size: 20px;
+    font-weight: 700;
+    color: #1e293b !important;
+    line-height: 1;
+}
+
+.upcoming-info {
+    flex: 1;
+}
+
+.upcoming-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: #1e293b !important;
+    margin-bottom: 4px;
+}
+
+.upcoming-meta {
+    font-size: 13px;
+    color: #64748b !important;
+}
+
+.upcoming-arrow {
+    color: #94a3b8 !important;
+    font-size: 18px;
+}
+
+/* 모바일 대응 */
+@media (max-width: 480px) {
+    .next-event-card {
+        flex-direction: row;
+    }
+    
+    .next-event-left {
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-width: 90px;
+        padding: 16px 12px;
+        border-right: 1px solid #bbf7d0;
+        border-bottom: none;
+    }
+    
+    .next-event-badge {
+        margin-bottom: 8px;
+        padding: 4px 10px;
+        font-size: 10px;
+    }
+    
+    .next-event-date-box {
+        flex-direction: column;
+        align-items: center;
+        gap: 0;
+    }
+    
+    .next-event-date-box .date-month {
+        font-size: 11px;
+        font-weight: 600;
+        color: #16a34a;
+    }
+    
+    .next-event-date-box .date-day {
+        font-size: 28px;
+        font-weight: 800;
+        color: #15803d;
+        margin: 2px 0 6px;
+    }
+    
+    .next-event-date-box .date-weekday {
+        padding: 3px 10px;
+        font-size: 10px;
+        margin-left: 0;
+    }
+    
+    .next-event-right {
+        padding: 14px 16px;
+        flex: 1;
+    }
+    
+    .next-event-title {
+        font-size: 16px;
+        text-align: left;
+        margin-bottom: 10px;
+    }
+    
+    .next-event-meta {
+        align-items: flex-start;
+        gap: 4px;
+    }
+    
+    .meta-item {
+        justify-content: flex-start;
+        font-size: 12px;
+    }
+    
+    .meta-item .meta-icon {
+        font-size: 12px;
+    }
+    
+    .next-event-footer {
+        flex-direction: row;
+        gap: 10px;
+        align-items: center;
+        justify-content: space-between;
+    }
+    
+    .attendees-badge {
+        padding: 5px 10px;
+        font-size: 11px;
+    }
+    
+    .view-detail {
+        padding: 5px 10px;
+        font-size: 11px;
+    }
+}
+</style>
+{% endblock %}
+
+

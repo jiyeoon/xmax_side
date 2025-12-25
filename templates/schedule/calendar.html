@@ -1,0 +1,677 @@
+{% extends 'base.html' %}
+{% load schedule_tags %}
+
+{% block title %}일정 - 테니스 클럽{% endblock %}
+
+{% block page_title %}클럽 일정{% endblock %}
+
+{% block header_actions %}
+<button class="btn btn-primary" onclick="openModal('addEventModal')">
+    <span>➕</span> 일정 추가
+</button>
+{% endblock %}
+
+{% block content %}
+<!-- 캘린더 네비게이션 -->
+<div class="calendar-nav">
+    <button class="btn btn-secondary" onclick="location.href='?year={{ prev_year }}&month={{ prev_month }}'">
+        ◀ 이전
+    </button>
+    <h2 class="calendar-title">{{ month_name }}</h2>
+    <button class="btn btn-secondary" onclick="location.href='?year={{ next_year }}&month={{ next_month }}'">
+        다음 ▶
+    </button>
+</div>
+
+<!-- 캘린더 그리드 -->
+<div class="calendar-grid">
+    <!-- 요일 헤더 -->
+    <div class="calendar-header-cell sunday">일</div>
+    <div class="calendar-header-cell">월</div>
+    <div class="calendar-header-cell">화</div>
+    <div class="calendar-header-cell">수</div>
+    <div class="calendar-header-cell">목</div>
+    <div class="calendar-header-cell">금</div>
+    <div class="calendar-header-cell saturday">토</div>
+    
+    <!-- 날짜 셀 -->
+    {% for week in month_days %}
+        {% for day in week %}
+            {% with day_str=day|date:"Y-m-d" %}
+            <div class="calendar-cell {% if day.month != month %}other-month{% endif %} {% if day == today %}today{% endif %}"
+                 onclick="openAddEventModal('{{ day_str }}')">
+                <div class="calendar-day">{{ day.day }}</div>
+                {% if day_str in events_by_date %}
+                    {% for event in events_by_date|get_item:day_str %}
+                    <div class="calendar-event {% if event.is_recurring %}recurring-event{% endif %}" 
+                         onclick="event.stopPropagation(); viewEvent({{ event.id }})">
+                        {% if event.is_recurring %}🔄{% endif %}{{ event.title }}
+                    </div>
+                    {% endfor %}
+                {% endif %}
+            </div>
+            {% endwith %}
+        {% endfor %}
+    {% endfor %}
+</div>
+
+<!-- 일정 추가 모달 -->
+<div id="addEventModal" class="modal-overlay">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 class="modal-title">📅 새 일정 추가</h3>
+            <button class="modal-close" onclick="closeModal('addEventModal')">×</button>
+        </div>
+        <div class="modal-body">
+            <form id="addEventForm">
+                <div class="form-group">
+                    <label class="form-label">제목 *</label>
+                    <input type="text" name="title" class="form-control" required placeholder="일정 제목">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">날짜 *</label>
+                    <input type="date" name="date" id="eventDate" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">시작 시간 *</label>
+                    <input type="time" name="start_time" class="form-control" required value="09:00">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">종료 시간 *</label>
+                    <input type="time" name="end_time" class="form-control" required value="12:00">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">장소 *</label>
+                    <input type="text" name="location" class="form-control" required placeholder="테니스장 위치">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">설명</label>
+                    <textarea name="description" class="form-control" rows="3" placeholder="추가 정보"></textarea>
+                </div>
+                
+                <!-- 반복 설정 섹션 -->
+                <div class="form-group">
+                    <label class="form-label">🔄 반복 설정</label>
+                    <select name="recurrence_type" id="recurrenceType" class="form-control" onchange="toggleRecurrenceOptions()">
+                        <option value="none">반복 없음</option>
+                        <option value="daily">매일</option>
+                        <option value="weekly">매주</option>
+                        <option value="custom">사용자 정의</option>
+                    </select>
+                </div>
+                
+                <!-- 반복 옵션 (반복 선택 시 표시) -->
+                <div id="recurrenceOptions" style="display: none;">
+                    <div class="form-group">
+                        <label class="form-label">반복 종료일 *</label>
+                        <input type="date" name="recurrence_end_date" id="recurrenceEndDate" class="form-control">
+                    </div>
+                    
+                    <!-- 사용자 정의 요일 선택 -->
+                    <div id="customWeekdaysSection" style="display: none;">
+                        <div class="form-group">
+                            <label class="form-label">반복 요일 선택</label>
+                            <div class="weekday-selector">
+                                <label class="weekday-btn">
+                                    <input type="checkbox" name="weekdays" value="0">
+                                    <span>월</span>
+                                </label>
+                                <label class="weekday-btn">
+                                    <input type="checkbox" name="weekdays" value="1">
+                                    <span>화</span>
+                                </label>
+                                <label class="weekday-btn">
+                                    <input type="checkbox" name="weekdays" value="2">
+                                    <span>수</span>
+                                </label>
+                                <label class="weekday-btn">
+                                    <input type="checkbox" name="weekdays" value="3">
+                                    <span>목</span>
+                                </label>
+                                <label class="weekday-btn">
+                                    <input type="checkbox" name="weekdays" value="4">
+                                    <span>금</span>
+                                </label>
+                                <label class="weekday-btn">
+                                    <input type="checkbox" name="weekdays" value="5">
+                                    <span>토</span>
+                                </label>
+                                <label class="weekday-btn">
+                                    <input type="checkbox" name="weekdays" value="6">
+                                    <span>일</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">참석 멤버</label>
+                    <div class="participant-grid" style="max-height: 200px; overflow-y: auto;">
+                        {% for member in members %}
+                        <label class="checkbox-wrapper">
+                            <input type="checkbox" name="attendees" value="{{ member.id }}">
+                            <span>{{ member.name }}</span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('addEventModal')">취소</button>
+            <button class="btn btn-primary" onclick="submitAddEvent()">추가하기</button>
+        </div>
+    </div>
+</div>
+
+<!-- 일정 상세 모달 -->
+<div id="viewEventModal" class="modal-overlay">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 class="modal-title" id="viewEventTitle">📅 일정 상세</h3>
+            <button class="modal-close" onclick="closeModal('viewEventModal')">×</button>
+        </div>
+        <div class="modal-body" id="viewEventContent">
+            <!-- 동적으로 채워짐 -->
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-danger" id="deleteEventBtn" onclick="showDeleteOptions()">삭제</button>
+            <button class="btn btn-primary" onclick="openEditEventModal()">수정</button>
+            <button class="btn btn-success" onclick="goToMatchmaking()">🎾 대진표 생성</button>
+            <button class="btn btn-secondary" onclick="closeModal('viewEventModal')">닫기</button>
+        </div>
+    </div>
+</div>
+
+<!-- 일정 수정 모달 -->
+<div id="editEventModal" class="modal-overlay">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 class="modal-title">✏️ 일정 수정</h3>
+            <button class="modal-close" onclick="closeModal('editEventModal')">×</button>
+        </div>
+        <div class="modal-body">
+            <form id="editEventForm">
+                <div class="form-group">
+                    <label class="form-label">제목 *</label>
+                    <input type="text" name="title" id="editEventTitle" class="form-control" required placeholder="일정 제목">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">날짜 *</label>
+                    <input type="date" name="date" id="editEventDate" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">시작 시간 *</label>
+                    <input type="time" name="start_time" id="editEventStartTime" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">종료 시간 *</label>
+                    <input type="time" name="end_time" id="editEventEndTime" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">장소 *</label>
+                    <input type="text" name="location" id="editEventLocation" class="form-control" required placeholder="테니스장 위치">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">설명</label>
+                    <textarea name="description" id="editEventDescription" class="form-control" rows="3" placeholder="추가 정보"></textarea>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">참석 멤버</label>
+                    <div class="participant-grid" id="editAttendeesGrid" style="max-height: 200px; overflow-y: auto;">
+                        {% for member in members %}
+                        <label class="checkbox-wrapper">
+                            <input type="checkbox" name="edit_attendees" value="{{ member.id }}">
+                            <span>{{ member.name }}</span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('editEventModal')">취소</button>
+            <button class="btn btn-primary" onclick="submitEditEvent()">저장</button>
+        </div>
+    </div>
+</div>
+
+<!-- 삭제 옵션 모달 (반복 일정용) -->
+<div id="deleteOptionsModal" class="modal-overlay">
+    <div class="modal" style="max-width: 400px;">
+        <div class="modal-header">
+            <h3 class="modal-title">🗑️ 일정 삭제</h3>
+            <button class="modal-close" onclick="closeModal('deleteOptionsModal')">×</button>
+        </div>
+        <div class="modal-body">
+            <p style="margin-bottom: 16px;">반복 일정입니다. 어떻게 삭제할까요?</p>
+            <div class="delete-options">
+                <button class="btn btn-outline" onclick="deleteEvent('single')" style="width: 100%; margin-bottom: 8px;">
+                    📌 이번 일정만 삭제
+                </button>
+                <button class="btn btn-outline" onclick="deleteEvent('future')" style="width: 100%; margin-bottom: 8px;">
+                    ⏩ 이번 및 앞으로의 일정 삭제
+                </button>
+                <button class="btn btn-danger" onclick="deleteEvent('all')" style="width: 100%;">
+                    🗑️ 모든 반복 일정 삭제
+                </button>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('deleteOptionsModal')">취소</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let currentEventId = null;
+let currentEventIsRecurring = false;
+let currentEventData = null;  // 현재 보고 있는 이벤트 데이터 저장
+
+// URL 파라미터에서 event ID 확인하여 자동으로 모달 열기
+document.addEventListener('DOMContentLoaded', function() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const eventId = urlParams.get('event');
+    
+    if (eventId) {
+        // URL에서 event 파라미터 제거 (히스토리 정리)
+        const cleanUrl = window.location.pathname + 
+            (urlParams.toString() ? '?' + urlParams.toString().replace(/event=[^&]*&?/, '').replace(/&$/, '') : '');
+        window.history.replaceState({}, '', cleanUrl || window.location.pathname);
+        
+        // 일정 상세 모달 열기
+        viewEvent(parseInt(eventId));
+    }
+});
+
+function openAddEventModal(dateStr) {
+    document.getElementById('eventDate').value = dateStr || '';
+    // 기본값으로 3개월 후 설정
+    if (dateStr) {
+        const endDate = new Date(dateStr);
+        endDate.setMonth(endDate.getMonth() + 3);
+        document.getElementById('recurrenceEndDate').value = endDate.toISOString().split('T')[0];
+    }
+    openModal('addEventModal');
+}
+
+function toggleRecurrenceOptions() {
+    const recurrenceType = document.getElementById('recurrenceType').value;
+    const optionsDiv = document.getElementById('recurrenceOptions');
+    const customSection = document.getElementById('customWeekdaysSection');
+    
+    if (recurrenceType === 'none') {
+        optionsDiv.style.display = 'none';
+    } else {
+        optionsDiv.style.display = 'block';
+        
+        if (recurrenceType === 'custom') {
+            customSection.style.display = 'block';
+        } else {
+            customSection.style.display = 'none';
+        }
+    }
+}
+
+async function submitAddEvent() {
+    const form = document.getElementById('addEventForm');
+    const formData = new FormData(form);
+    
+    // 참석자 배열로 변환
+    const attendees = [];
+    form.querySelectorAll('input[name="attendees"]:checked').forEach(cb => {
+        attendees.push(parseInt(cb.value));
+    });
+    
+    // 선택된 요일 배열로 변환
+    const weekdays = [];
+    form.querySelectorAll('input[name="weekdays"]:checked').forEach(cb => {
+        weekdays.push(parseInt(cb.value));
+    });
+    
+    const recurrenceType = formData.get('recurrence_type');
+    
+    // 반복 설정 검증
+    if (recurrenceType !== 'none') {
+        const endDate = formData.get('recurrence_end_date');
+        if (!endDate) {
+            showToast('반복 종료일을 선택해주세요', 'error');
+            return;
+        }
+        
+        if (recurrenceType === 'custom' && weekdays.length === 0) {
+            showToast('반복할 요일을 선택해주세요', 'error');
+            return;
+        }
+    }
+    
+    const data = {
+        title: formData.get('title'),
+        date: formData.get('date'),
+        start_time: formData.get('start_time'),
+        end_time: formData.get('end_time'),
+        location: formData.get('location'),
+        description: formData.get('description'),
+        attendees: attendees,
+        recurrence_type: recurrenceType,
+        recurrence_end_date: formData.get('recurrence_end_date'),
+        recurrence_weekdays: weekdays,
+    };
+    
+    try {
+        const result = await fetchWithCSRF('/schedule/api/event/create/', {
+            method: 'POST',
+            body: JSON.stringify(data),
+        });
+        
+        if (result.success) {
+            let message = '일정이 추가되었습니다! 🎉';
+            if (result.created_count > 1) {
+                message = `${result.created_count}개의 일정이 생성되었습니다! 🎉`;
+            }
+            showToast(message);
+            closeModal('addEventModal');
+            location.reload();
+        } else {
+            showToast(result.error || '오류가 발생했습니다', 'error');
+        }
+    } catch (error) {
+        showToast('오류가 발생했습니다', 'error');
+    }
+}
+
+async function viewEvent(eventId) {
+    currentEventId = eventId;
+    
+    try {
+        const response = await fetch(`/schedule/api/event/${eventId}/`);
+        const event = await response.json();
+        
+        currentEventData = event;
+        currentEventIsRecurring = event.is_recurring;
+        
+        document.getElementById('viewEventTitle').textContent = `📅 ${event.title}`;
+        
+        // 참석자를 성별로 분리
+        let attendeesHtml = '';
+        if (event.attendees.length > 0) {
+            const males = event.attendees.filter(a => a.gender === 'M');
+            const females = event.attendees.filter(a => a.gender === 'F');
+            
+            attendeesHtml = `
+                <div class="attendees-grid">
+                    <div class="attendees-group males">
+                        <div class="group-header">🙋‍♂️ 남자 <span class="count">${males.length}명</span></div>
+                        <div class="group-members">
+                            ${males.length > 0 ? males.map(a => `<span class="attendee-badge male">${a.name}</span>`).join('') : '<span class="no-attendee">-</span>'}
+                        </div>
+                    </div>
+                    <div class="attendees-group females">
+                        <div class="group-header">🙋‍♀️ 여자 <span class="count">${females.length}명</span></div>
+                        <div class="group-members">
+                            ${females.length > 0 ? females.map(a => `<span class="attendee-badge female">${a.name}</span>`).join('') : '<span class="no-attendee">-</span>'}
+                        </div>
+                    </div>
+                </div>
+            `;
+        } else {
+            attendeesHtml = '<div class="no-attendees">참석자가 없습니다</div>';
+        }
+        
+        document.getElementById('viewEventContent').innerHTML = `
+            <div class="event-detail-card">
+                <!-- 상단: 날짜 + 기본 정보 -->
+                <div class="event-hero">
+                    <div class="event-date-badge">
+                        <span class="date-month">${new Date(event.date).toLocaleDateString('ko-KR', { month: 'short' })}</span>
+                        <span class="date-day">${new Date(event.date).getDate()}</span>
+                        <span class="date-weekday">${new Date(event.date).toLocaleDateString('ko-KR', { weekday: 'short' })}</span>
+                    </div>
+                    <div class="event-main-info">
+                        <div class="event-info-row">
+                            <span class="info-icon">🕐</span>
+                            <span class="info-text">${event.start_time} - ${event.end_time}</span>
+                        </div>
+                        <div class="event-info-row">
+                            <span class="info-icon">📍</span>
+                            <span class="info-text">${event.location}</span>
+                        </div>
+                        ${event.is_recurring ? `
+                        <div class="event-info-row recurrence">
+                            <span class="info-icon">🔄</span>
+                            <span class="info-text">${
+                                event.recurrence_type === 'daily' ? '매일 반복' :
+                                event.recurrence_type === 'weekly' ? '매주 반복' :
+                                event.recurrence_type === 'custom' ? `매주 ${event.recurrence_weekdays.map(d => ['월','화','수','목','금','토','일'][d]).join(', ')}` :
+                                '반복 일정'
+                            }</span>
+                        </div>
+                        ` : ''}
+                    </div>
+                </div>
+                
+                ${event.description ? `
+                <!-- 메모 섹션 -->
+                <div class="event-section description">
+                    <div class="event-section-header">
+                        <span class="event-section-title">📝 메모</span>
+                    </div>
+                    <div class="event-section-content">${event.description}</div>
+                </div>
+                ` : ''}
+                
+                <!-- 참석자 섹션 -->
+                <div class="event-section attendees">
+                    <div class="event-section-header">
+                        <span class="event-section-title">👥 참석자</span>
+                        <span class="event-section-badge">${event.attendees.length}명</span>
+                    </div>
+                    <div class="event-section-content">
+                        ${attendeesHtml}
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        openModal('viewEventModal');
+    } catch (error) {
+        showToast('일정을 불러올 수 없습니다', 'error');
+    }
+}
+
+function goToMatchmaking() {
+    if (!currentEventData) {
+        showToast('일정 정보를 불러올 수 없습니다', 'error');
+        return;
+    }
+    
+    // 참석자 ID 배열 만들기
+    const attendeeIds = currentEventData.attendees.map(a => a.id);
+    
+    // URL 파라미터로 전달
+    const params = new URLSearchParams();
+    if (attendeeIds.length > 0) {
+        params.set('members', attendeeIds.join(','));
+    }
+    params.set('date', currentEventData.date);
+    params.set('title', currentEventData.title);
+    
+    // 대진표 페이지로 이동
+    window.location.href = `/matchmaking/?${params.toString()}`;
+}
+
+function showDeleteOptions() {
+    if (!currentEventId) return;
+    
+    if (currentEventIsRecurring) {
+        // 반복 일정인 경우 옵션 모달 표시
+        closeModal('viewEventModal');
+        openModal('deleteOptionsModal');
+    } else {
+        // 단일 일정인 경우 바로 삭제
+        if (confirm('정말 이 일정을 삭제하시겠습니까?')) {
+            deleteEvent('single');
+        }
+    }
+}
+
+async function deleteEvent(deleteType) {
+    if (!currentEventId) return;
+    
+    try {
+        const result = await fetchWithCSRF(`/schedule/api/event/delete/${currentEventId}/`, {
+            method: 'POST',
+            body: JSON.stringify({ delete_type: deleteType }),
+        });
+        
+        if (result.success) {
+            let message = '일정이 삭제되었습니다';
+            if (result.deleted_count > 1) {
+                message = `${result.deleted_count}개의 일정이 삭제되었습니다`;
+            }
+            showToast(message);
+            closeModal('viewEventModal');
+            closeModal('deleteOptionsModal');
+            location.reload();
+        } else {
+            showToast(result.error || '오류가 발생했습니다', 'error');
+        }
+    } catch (error) {
+        showToast('오류가 발생했습니다', 'error');
+    }
+}
+
+// 일정 수정 모달 열기
+function openEditEventModal() {
+    if (!currentEventData) {
+        showToast('일정 정보를 불러올 수 없습니다', 'error');
+        return;
+    }
+    
+    const event = currentEventData;
+    
+    // 폼에 데이터 채우기
+    document.getElementById('editEventTitle').value = event.title;
+    document.getElementById('editEventDate').value = event.date;
+    document.getElementById('editEventStartTime').value = event.start_time;
+    document.getElementById('editEventEndTime').value = event.end_time;
+    document.getElementById('editEventLocation').value = event.location;
+    document.getElementById('editEventDescription').value = event.description || '';
+    
+    // 참석자 체크박스 초기화
+    const attendeeIds = event.attendees.map(a => a.id);
+    document.querySelectorAll('#editAttendeesGrid input[name="edit_attendees"]').forEach(cb => {
+        cb.checked = attendeeIds.includes(parseInt(cb.value));
+    });
+    
+    closeModal('viewEventModal');
+    openModal('editEventModal');
+}
+
+// 일정 수정 제출
+async function submitEditEvent() {
+    if (!currentEventId) return;
+    
+    const form = document.getElementById('editEventForm');
+    const title = document.getElementById('editEventTitle').value.trim();
+    
+    if (!title) {
+        showToast('제목을 입력해주세요', 'error');
+        return;
+    }
+    
+    // 참석자 배열로 변환
+    const attendees = [];
+    form.querySelectorAll('input[name="edit_attendees"]:checked').forEach(cb => {
+        attendees.push(parseInt(cb.value));
+    });
+    
+    const data = {
+        title: title,
+        date: document.getElementById('editEventDate').value,
+        start_time: document.getElementById('editEventStartTime').value,
+        end_time: document.getElementById('editEventEndTime').value,
+        location: document.getElementById('editEventLocation').value,
+        description: document.getElementById('editEventDescription').value,
+        attendees: attendees,
+    };
+    
+    try {
+        const result = await fetchWithCSRF(`/schedule/api/event/update/${currentEventId}/`, {
+            method: 'POST',
+            body: JSON.stringify(data),
+        });
+        
+        if (result.success) {
+            showToast('일정이 수정되었습니다! ✅');
+            closeModal('editEventModal');
+            location.reload();
+        } else {
+            showToast(result.error || '오류가 발생했습니다', 'error');
+        }
+    } catch (error) {
+        showToast('오류가 발생했습니다', 'error');
+    }
+}
+</script>
+
+<style>
+/* 반복 일정 스타일 */
+.recurring-event {
+    border-left: 3px solid #4CAF50 !important;
+}
+
+/* 요일 선택기 스타일 */
+.weekday-selector {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.weekday-btn {
+    display: inline-block;
+}
+
+.weekday-btn input[type="checkbox"] {
+    display: none;
+}
+
+.weekday-btn span {
+    display: inline-block;
+    width: 40px;
+    height: 40px;
+    line-height: 40px;
+    text-align: center;
+    border: 2px solid #ddd;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-weight: bold;
+}
+
+.weekday-btn input:checked + span {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+    color: white;
+}
+
+.weekday-btn span:hover {
+    border-color: var(--primary-color);
+}
+
+/* 삭제 옵션 버튼 */
+.btn-outline {
+    background: transparent;
+    border: 2px solid #ddd;
+    color: #333;
+}
+
+.btn-outline:hover {
+    background: #f5f5f5;
+    border-color: #bbb;
+}
+</style>
+{% endblock %}
