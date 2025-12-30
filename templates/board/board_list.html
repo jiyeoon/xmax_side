@@ -1,0 +1,640 @@
+{% extends 'base.html' %}
+
+{% block title %}게시판 - HumbleB{% endblock %}
+
+{% block content %}
+<div class="board-container">
+    <!-- 헤더 -->
+    <div class="board-header">
+        <h1>📋 게시판</h1>
+        <button class="btn btn-primary" onclick="openWriteModal()">
+            ✏️ 글쓰기
+        </button>
+    </div>
+
+    <!-- 카테고리 탭 -->
+    <div class="board-tabs">
+        <a href="?category=all&view={{ view_type }}" 
+           class="tab {% if category == 'all' %}active{% endif %}">
+            전체
+        </a>
+        <a href="?category=notice&view={{ view_type }}" 
+           class="tab {% if category == 'notice' %}active{% endif %}">
+            📢 공지사항
+        </a>
+        <a href="?category=free&view={{ view_type }}" 
+           class="tab {% if category == 'free' %}active{% endif %}">
+            💬 자유게시판
+        </a>
+        <a href="?category=gallery&view={{ view_type }}" 
+           class="tab {% if category == 'gallery' %}active{% endif %}">
+            📸 사진갤러리
+        </a>
+    </div>
+
+    <!-- 검색 & 뷰 전환 -->
+    <div class="board-toolbar">
+        <form class="search-form" method="GET">
+            <input type="hidden" name="category" value="{{ category }}">
+            <input type="hidden" name="view" value="{{ view_type }}">
+            <input type="text" name="search" value="{{ search }}" placeholder="검색어 입력...">
+            <button type="submit">🔍</button>
+        </form>
+        <div class="view-toggle">
+            <a href="?category={{ category }}&view=list&search={{ search }}" 
+               class="view-btn {% if view_type == 'list' %}active{% endif %}" title="리스트 뷰">
+                ☰
+            </a>
+            <a href="?category={{ category }}&view=gallery&search={{ search }}" 
+               class="view-btn {% if view_type == 'gallery' %}active{% endif %}" title="갤러리 뷰">
+                ▦
+            </a>
+        </div>
+    </div>
+
+    <!-- 게시글 목록 -->
+    {% if view_type == 'gallery' %}
+    <!-- 갤러리 뷰 -->
+    <div class="posts-gallery">
+        {% for post in posts %}
+        <a href="{% url 'board:detail' post.id %}" class="gallery-item">
+            <div class="gallery-thumbnail">
+                {% if post.images.first %}
+                <img src="{{ post.images.first.image.url }}" alt="{{ post.title }}">
+                {% else %}
+                <div class="no-image">
+                    {% if post.category == 'notice' %}📢
+                    {% elif post.category == 'gallery' %}📸
+                    {% else %}💬{% endif %}
+                </div>
+                {% endif %}
+                {% if post.images.count > 1 %}
+                <span class="image-count">+{{ post.images.count }}</span>
+                {% endif %}
+            </div>
+            <div class="gallery-info">
+                {% if post.is_pinned %}<span class="pin-badge">📌</span>{% endif %}
+                <span class="category-badge {{ post.category }}">{{ post.get_category_display }}</span>
+                <h3>{{ post.title }}</h3>
+                <div class="meta">
+                    <span>{{ post.author_name }}</span>
+                    <span>👁 {{ post.view_count }}</span>
+                    <span>💬 {{ post.comments.count }}</span>
+                </div>
+            </div>
+        </a>
+        {% empty %}
+        <div class="no-posts">
+            <p>게시글이 없습니다.</p>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <!-- 리스트 뷰 -->
+    <div class="posts-list">
+        {% for post in posts %}
+        <a href="{% url 'board:detail' post.id %}" class="list-item">
+            <div class="list-main">
+                {% if post.is_pinned %}<span class="pin-badge">📌</span>{% endif %}
+                <span class="category-badge {{ post.category }}">{{ post.get_category_display }}</span>
+                <h3>{{ post.title }}</h3>
+                {% if post.images.count > 0 %}
+                <span class="has-image">📷{{ post.images.count }}</span>
+                {% endif %}
+                {% if post.comments.count > 0 %}
+                <span class="comment-count">[{{ post.comments.count }}]</span>
+                {% endif %}
+            </div>
+            <div class="list-meta">
+                <span class="author">{{ post.author_name }}</span>
+                <span class="date">{{ post.created_at|date:"m/d" }}</span>
+                <span class="views">👁 {{ post.view_count }}</span>
+            </div>
+        </a>
+        {% empty %}
+        <div class="no-posts">
+            <p>게시글이 없습니다.</p>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- 페이지네이션 -->
+    {% if posts.has_other_pages %}
+    <div class="pagination">
+        {% if posts.has_previous %}
+        <a href="?category={{ category }}&view={{ view_type }}&search={{ search }}&page={{ posts.previous_page_number }}" class="page-btn">‹ 이전</a>
+        {% endif %}
+        
+        <span class="page-info">{{ posts.number }} / {{ posts.paginator.num_pages }}</span>
+        
+        {% if posts.has_next %}
+        <a href="?category={{ category }}&view={{ view_type }}&search={{ search }}&page={{ posts.next_page_number }}" class="page-btn">다음 ›</a>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+
+<!-- 글쓰기 모달 -->
+<div id="writeModal" class="modal" style="display:none;">
+    <div class="modal-content modal-large">
+        <div class="modal-header">
+            <h2>✏️ 글쓰기</h2>
+            <button class="modal-close" onclick="closeWriteModal()">&times;</button>
+        </div>
+        <form id="writeForm" enctype="multipart/form-data">
+            {% csrf_token %}
+            <div class="form-group">
+                <label>카테고리</label>
+                <select name="category" id="writeCategory">
+                    <option value="free">💬 자유게시판</option>
+                    <option value="notice">📢 공지사항</option>
+                    <option value="gallery">📸 사진갤러리</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>작성자</label>
+                <select name="author_id" id="writeAuthor">
+                    <option value="">직접 입력</option>
+                    {% for member in members %}
+                    <option value="{{ member.id }}">{{ member.name }}</option>
+                    {% endfor %}
+                </select>
+                <input type="text" name="author_name" id="writeAuthorName" placeholder="작성자 이름" style="margin-top: 8px;">
+            </div>
+            <div class="form-group">
+                <label>제목</label>
+                <input type="text" name="title" id="writeTitle" placeholder="제목을 입력하세요" required>
+            </div>
+            <div class="form-group">
+                <label>내용</label>
+                <textarea name="content" id="writeContent" rows="10" placeholder="내용을 입력하세요"></textarea>
+            </div>
+            <div class="form-group">
+                <label>이미지 첨부</label>
+                <input type="file" name="images" id="writeImages" multiple accept="image/*">
+                <div id="imagePreview" class="image-preview"></div>
+            </div>
+            <div class="form-group checkbox-group">
+                <label>
+                    <input type="checkbox" name="is_pinned" id="writePinned">
+                    📌 상단 고정 (공지사항)
+                </label>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeWriteModal()">취소</button>
+                <button type="submit" class="btn btn-primary">등록</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+.board-container {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.board-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.board-header h1 {
+    font-size: 1.8rem;
+    margin: 0;
+}
+
+/* 카테고리 탭 */
+.board-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+    border-bottom: 2px solid #e5e7eb;
+    padding-bottom: 8px;
+    overflow-x: auto;
+}
+
+.board-tabs .tab {
+    padding: 8px 16px;
+    border-radius: 20px;
+    text-decoration: none;
+    color: #64748b;
+    font-weight: 500;
+    white-space: nowrap;
+    transition: all 0.2s;
+}
+
+.board-tabs .tab:hover {
+    background: #f1f5f9;
+}
+
+.board-tabs .tab.active {
+    background: #3b82f6;
+    color: white;
+}
+
+/* 툴바 */
+.board-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    gap: 16px;
+}
+
+.search-form {
+    display: flex;
+    flex: 1;
+    max-width: 300px;
+}
+
+.search-form input {
+    flex: 1;
+    padding: 8px 12px;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px 0 0 8px;
+    outline: none;
+}
+
+.search-form button {
+    padding: 8px 12px;
+    background: #3b82f6;
+    color: white;
+    border: none;
+    border-radius: 0 8px 8px 0;
+    cursor: pointer;
+}
+
+.view-toggle {
+    display: flex;
+    gap: 4px;
+}
+
+.view-btn {
+    padding: 8px 12px;
+    background: #f1f5f9;
+    border-radius: 8px;
+    text-decoration: none;
+    color: #64748b;
+    font-size: 1.2rem;
+}
+
+.view-btn.active {
+    background: #3b82f6;
+    color: white;
+}
+
+/* 리스트 뷰 */
+.posts-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    background: #e5e7eb;
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.list-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 16px;
+    background: white;
+    text-decoration: none;
+    color: inherit;
+    transition: background 0.2s;
+}
+
+.list-item:hover {
+    background: #f8fafc;
+}
+
+.list-main {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    min-width: 0;
+}
+
+.list-main h3 {
+    font-size: 0.95rem;
+    font-weight: 500;
+    margin: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.list-meta {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 0.85rem;
+    color: #64748b;
+    flex-shrink: 0;
+}
+
+.category-badge {
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    flex-shrink: 0;
+}
+
+.category-badge.notice { background: #fef3c7; color: #92400e; }
+.category-badge.free { background: #dbeafe; color: #1e40af; }
+.category-badge.gallery { background: #fce7f3; color: #9d174d; }
+
+.pin-badge {
+    flex-shrink: 0;
+}
+
+.has-image, .comment-count {
+    color: #3b82f6;
+    font-size: 0.85rem;
+    flex-shrink: 0;
+}
+
+/* 갤러리 뷰 */
+.posts-gallery {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 16px;
+}
+
+.gallery-item {
+    background: white;
+    border-radius: 12px;
+    overflow: hidden;
+    text-decoration: none;
+    color: inherit;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.gallery-item:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+}
+
+.gallery-thumbnail {
+    position: relative;
+    aspect-ratio: 4/3;
+    background: #f1f5f9;
+    overflow: hidden;
+}
+
+.gallery-thumbnail img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.gallery-thumbnail .no-image {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 3rem;
+    background: linear-gradient(135deg, #f1f5f9, #e2e8f0);
+}
+
+.gallery-thumbnail .image-count {
+    position: absolute;
+    bottom: 8px;
+    right: 8px;
+    background: rgba(0,0,0,0.7);
+    color: white;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+}
+
+.gallery-info {
+    padding: 12px;
+}
+
+.gallery-info h3 {
+    font-size: 0.95rem;
+    font-weight: 600;
+    margin: 8px 0 4px;
+    line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.gallery-info .meta {
+    display: flex;
+    gap: 8px;
+    font-size: 0.8rem;
+    color: #64748b;
+}
+
+/* 페이지네이션 */
+.pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 16px;
+    margin-top: 24px;
+}
+
+.page-btn {
+    padding: 8px 16px;
+    background: #f1f5f9;
+    border-radius: 8px;
+    text-decoration: none;
+    color: #1e293b;
+}
+
+.page-btn:hover {
+    background: #e2e8f0;
+}
+
+.page-info {
+    color: #64748b;
+}
+
+/* 빈 목록 */
+.no-posts {
+    text-align: center;
+    padding: 60px 20px;
+    color: #64748b;
+    background: white;
+    border-radius: 12px;
+}
+
+/* 모달 */
+.modal-large {
+    max-width: 600px;
+    width: 95%;
+}
+
+.form-group {
+    margin-bottom: 16px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 6px;
+    font-weight: 500;
+    color: #374151;
+}
+
+.form-group input[type="text"],
+.form-group select,
+.form-group textarea {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    box-sizing: border-box;
+}
+
+.form-group textarea {
+    resize: vertical;
+    min-height: 150px;
+}
+
+.checkbox-group label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+}
+
+.image-preview {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.image-preview img {
+    width: 80px;
+    height: 80px;
+    object-fit: cover;
+    border-radius: 8px;
+}
+
+/* 반응형 */
+@media (max-width: 768px) {
+    .board-header {
+        flex-direction: column;
+        gap: 12px;
+        align-items: stretch;
+    }
+    
+    .board-toolbar {
+        flex-direction: column;
+    }
+    
+    .search-form {
+        max-width: 100%;
+    }
+    
+    .list-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+    
+    .list-meta {
+        width: 100%;
+        justify-content: flex-start;
+    }
+    
+    .posts-gallery {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+    }
+}
+</style>
+
+<script>
+// 작성자 선택 시 이름 자동 입력
+document.getElementById('writeAuthor').addEventListener('change', function() {
+    const authorNameInput = document.getElementById('writeAuthorName');
+    if (this.value) {
+        authorNameInput.value = this.options[this.selectedIndex].text;
+        authorNameInput.style.display = 'none';
+    } else {
+        authorNameInput.value = '';
+        authorNameInput.style.display = 'block';
+    }
+});
+
+// 이미지 미리보기
+document.getElementById('writeImages').addEventListener('change', function() {
+    const preview = document.getElementById('imagePreview');
+    preview.innerHTML = '';
+    
+    Array.from(this.files).forEach(file => {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const img = document.createElement('img');
+            img.src = e.target.result;
+            preview.appendChild(img);
+        };
+        reader.readAsDataURL(file);
+    });
+});
+
+// 모달 열기/닫기
+function openWriteModal() {
+    document.getElementById('writeModal').style.display = 'flex';
+    document.getElementById('writeCategory').value = '{{ category }}' !== 'all' ? '{{ category }}' : 'free';
+}
+
+function closeWriteModal() {
+    document.getElementById('writeModal').style.display = 'none';
+    document.getElementById('writeForm').reset();
+    document.getElementById('imagePreview').innerHTML = '';
+    document.getElementById('writeAuthorName').style.display = 'block';
+}
+
+// 글 작성
+document.getElementById('writeForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(this);
+    
+    try {
+        const response = await fetch('{% url "board:create" %}', {
+            method: 'POST',
+            body: formData,
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showToast(data.message);
+            closeWriteModal();
+            window.location.href = '/board/' + data.post_id + '/';
+        } else {
+            showToast(data.error, 'error');
+        }
+    } catch (error) {
+        showToast('오류가 발생했습니다.', 'error');
+    }
+});
+
+// 모달 외부 클릭 시 닫기
+document.getElementById('writeModal').addEventListener('click', function(e) {
+    if (e.target === this) {
+        closeWriteModal();
+    }
+});
+</script>
+{% endblock %}
+

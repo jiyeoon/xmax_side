@@ -1,0 +1,712 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ post.title }} - HumbleB{% endblock %}
+
+{% block content %}
+<div class="post-container">
+    <!-- 뒤로가기 -->
+    <a href="{% url 'board:list' %}?category={{ post.category }}" class="back-link">
+        ← 목록으로
+    </a>
+    
+    <!-- 게시글 헤더 -->
+    <div class="post-header">
+        <div class="post-badges">
+            {% if post.is_pinned %}<span class="pin-badge">📌 고정</span>{% endif %}
+            <span class="category-badge {{ post.category }}">{{ post.get_category_display }}</span>
+        </div>
+        <h1>{{ post.title }}</h1>
+        <div class="post-meta">
+            <span class="author">{{ post.author_name }}</span>
+            <span class="date">{{ post.created_at|date:"Y년 m월 d일 H:i" }}</span>
+            <span class="views">👁 {{ post.view_count }}</span>
+        </div>
+    </div>
+    
+    <!-- 이미지 갤러리 -->
+    {% if post.images.exists %}
+    <div class="post-images">
+        {% for image in post.images.all %}
+        <div class="image-item" onclick="openImageModal('{{ image.image.url }}')">
+            <img src="{{ image.image.url }}" alt="이미지 {{ forloop.counter }}">
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+    
+    <!-- 본문 -->
+    <div class="post-content">
+        {{ post.content|linebreaks }}
+    </div>
+    
+    <!-- 액션 버튼 -->
+    <div class="post-actions">
+        <button class="btn btn-secondary" onclick="openEditModal()">✏️ 수정</button>
+        <button class="btn btn-danger" onclick="deletePost()">🗑️ 삭제</button>
+    </div>
+    
+    <!-- 이전/다음 글 -->
+    <div class="post-navigation">
+        {% if prev_post %}
+        <a href="{% url 'board:detail' prev_post.id %}" class="nav-item prev">
+            <span class="label">이전 글</span>
+            <span class="title">{{ prev_post.title }}</span>
+        </a>
+        {% else %}
+        <div class="nav-item prev disabled">
+            <span class="label">이전 글</span>
+            <span class="title">없음</span>
+        </div>
+        {% endif %}
+        
+        {% if next_post %}
+        <a href="{% url 'board:detail' next_post.id %}" class="nav-item next">
+            <span class="label">다음 글</span>
+            <span class="title">{{ next_post.title }}</span>
+        </a>
+        {% else %}
+        <div class="nav-item next disabled">
+            <span class="label">다음 글</span>
+            <span class="title">없음</span>
+        </div>
+        {% endif %}
+    </div>
+    
+    <!-- 댓글 섹션 -->
+    <div class="comments-section">
+        <h3>💬 댓글 <span class="comment-count">{{ post.comments.count }}</span></h3>
+        
+        <!-- 댓글 작성 -->
+        <div class="comment-form">
+            <select id="commentAuthor">
+                <option value="">익명</option>
+                {% for member in post.author.id|default:0 %}{% endfor %}
+            </select>
+            <input type="text" id="commentAuthorName" placeholder="이름">
+            <textarea id="commentContent" placeholder="댓글을 입력하세요..." rows="2"></textarea>
+            <button class="btn btn-primary" onclick="submitComment()">등록</button>
+        </div>
+        
+        <!-- 댓글 목록 -->
+        <div class="comments-list" id="commentsList">
+            {% for comment in post.comments.all %}
+            <div class="comment-item" data-id="{{ comment.id }}">
+                <div class="comment-header">
+                    <span class="comment-author">{{ comment.author_name }}</span>
+                    <span class="comment-date">{{ comment.created_at|date:"m/d H:i" }}</span>
+                    <button class="comment-delete" onclick="deleteComment({{ comment.id }})">&times;</button>
+                </div>
+                <div class="comment-content">{{ comment.content|linebreaks }}</div>
+            </div>
+            {% empty %}
+            <div class="no-comments" id="noComments">
+                <p>첫 댓글을 작성해보세요!</p>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<!-- 이미지 모달 -->
+<div id="imageModal" class="image-modal" onclick="closeImageModal()">
+    <img id="modalImage" src="" alt="확대 이미지">
+</div>
+
+<!-- 수정 모달 -->
+<div id="editModal" class="modal" style="display:none;">
+    <div class="modal-content modal-large">
+        <div class="modal-header">
+            <h2>✏️ 글 수정</h2>
+            <button class="modal-close" onclick="closeEditModal()">&times;</button>
+        </div>
+        <form id="editForm" enctype="multipart/form-data">
+            {% csrf_token %}
+            <div class="form-group">
+                <label>카테고리</label>
+                <select name="category" id="editCategory">
+                    <option value="free" {% if post.category == 'free' %}selected{% endif %}>💬 자유게시판</option>
+                    <option value="notice" {% if post.category == 'notice' %}selected{% endif %}>📢 공지사항</option>
+                    <option value="gallery" {% if post.category == 'gallery' %}selected{% endif %}>📸 사진갤러리</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>제목</label>
+                <input type="text" name="title" id="editTitle" value="{{ post.title }}" required>
+            </div>
+            <div class="form-group">
+                <label>내용</label>
+                <textarea name="content" id="editContent" rows="10">{{ post.content }}</textarea>
+            </div>
+            <div class="form-group">
+                <label>기존 이미지</label>
+                <div class="existing-images" id="existingImages">
+                    {% for image in post.images.all %}
+                    <div class="existing-image" data-id="{{ image.id }}">
+                        <img src="{{ image.image.url }}" alt="">
+                        <button type="button" class="remove-image" onclick="markImageDelete({{ image.id }})">&times;</button>
+                    </div>
+                    {% endfor %}
+                </div>
+                <input type="hidden" name="delete_images" id="deleteImages" value="">
+            </div>
+            <div class="form-group">
+                <label>새 이미지 추가</label>
+                <input type="file" name="images" id="editImages" multiple accept="image/*">
+            </div>
+            <div class="form-group checkbox-group">
+                <label>
+                    <input type="checkbox" name="is_pinned" id="editPinned" {% if post.is_pinned %}checked{% endif %}>
+                    📌 상단 고정
+                </label>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeEditModal()">취소</button>
+                <button type="submit" class="btn btn-primary">저장</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+.post-container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.back-link {
+    display: inline-block;
+    color: #64748b;
+    text-decoration: none;
+    margin-bottom: 16px;
+    font-size: 0.9rem;
+}
+
+.back-link:hover {
+    color: #3b82f6;
+}
+
+.post-header {
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.post-badges {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.pin-badge {
+    background: #fef3c7;
+    color: #92400e;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 0.8rem;
+}
+
+.category-badge {
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+
+.category-badge.notice { background: #fef3c7; color: #92400e; }
+.category-badge.free { background: #dbeafe; color: #1e40af; }
+.category-badge.gallery { background: #fce7f3; color: #9d174d; }
+
+.post-header h1 {
+    font-size: 1.6rem;
+    margin: 0 0 12px;
+    line-height: 1.4;
+}
+
+.post-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    font-size: 0.9rem;
+    color: #64748b;
+}
+
+.post-meta .author {
+    font-weight: 500;
+    color: #1e293b;
+}
+
+/* 이미지 갤러리 */
+.post-images {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 12px;
+    margin-bottom: 24px;
+}
+
+.image-item {
+    aspect-ratio: 1;
+    border-radius: 12px;
+    overflow: hidden;
+    cursor: pointer;
+}
+
+.image-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.2s;
+}
+
+.image-item:hover img {
+    transform: scale(1.05);
+}
+
+/* 본문 */
+.post-content {
+    font-size: 1rem;
+    line-height: 1.8;
+    color: #374151;
+    min-height: 100px;
+    margin-bottom: 24px;
+}
+
+/* 액션 버튼 */
+.post-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    padding: 16px 0;
+    border-top: 1px solid #e5e7eb;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+/* 이전/다음 네비게이션 */
+.post-navigation {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin: 24px 0;
+}
+
+.nav-item {
+    padding: 16px;
+    background: #f8fafc;
+    border-radius: 12px;
+    text-decoration: none;
+    color: inherit;
+    transition: background 0.2s;
+}
+
+.nav-item:hover:not(.disabled) {
+    background: #f1f5f9;
+}
+
+.nav-item.disabled {
+    opacity: 0.5;
+}
+
+.nav-item .label {
+    display: block;
+    font-size: 0.8rem;
+    color: #64748b;
+    margin-bottom: 4px;
+}
+
+.nav-item .title {
+    font-size: 0.95rem;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.nav-item.next {
+    text-align: right;
+}
+
+/* 댓글 섹션 */
+.comments-section {
+    margin-top: 32px;
+}
+
+.comments-section h3 {
+    font-size: 1.1rem;
+    margin-bottom: 16px;
+}
+
+.comment-count {
+    color: #3b82f6;
+}
+
+.comment-form {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 16px;
+    background: #f8fafc;
+    border-radius: 12px;
+    margin-bottom: 16px;
+}
+
+.comment-form select,
+.comment-form input,
+.comment-form textarea {
+    padding: 10px 12px;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    font-size: 0.95rem;
+}
+
+.comment-form textarea {
+    resize: vertical;
+}
+
+.comment-form button {
+    align-self: flex-end;
+}
+
+.comments-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.comment-item {
+    padding: 16px;
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+}
+
+.comment-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 8px;
+}
+
+.comment-author {
+    font-weight: 600;
+    color: #1e293b;
+}
+
+.comment-date {
+    font-size: 0.85rem;
+    color: #64748b;
+}
+
+.comment-delete {
+    margin-left: auto;
+    background: none;
+    border: none;
+    color: #94a3b8;
+    cursor: pointer;
+    font-size: 1.2rem;
+    padding: 0 4px;
+}
+
+.comment-delete:hover {
+    color: #ef4444;
+}
+
+.comment-content {
+    font-size: 0.95rem;
+    color: #374151;
+    line-height: 1.6;
+}
+
+.comment-content p {
+    margin: 0;
+}
+
+.no-comments {
+    text-align: center;
+    padding: 40px;
+    color: #64748b;
+}
+
+/* 이미지 모달 */
+.image-modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.9);
+    z-index: 1000;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+}
+
+.image-modal img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+}
+
+/* 수정 모달 */
+.modal-large {
+    max-width: 600px;
+    width: 95%;
+}
+
+.existing-images {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.existing-image {
+    position: relative;
+    width: 80px;
+    height: 80px;
+}
+
+.existing-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 8px;
+}
+
+.existing-image .remove-image {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    width: 24px;
+    height: 24px;
+    background: #ef4444;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 1rem;
+    line-height: 1;
+}
+
+.existing-image.marked-delete {
+    opacity: 0.3;
+}
+
+.form-group {
+    margin-bottom: 16px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 6px;
+    font-weight: 500;
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    box-sizing: border-box;
+}
+
+.checkbox-group label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+}
+
+/* 반응형 */
+@media (max-width: 768px) {
+    .post-navigation {
+        grid-template-columns: 1fr;
+    }
+    
+    .post-images {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .comment-form {
+        padding: 12px;
+    }
+}
+</style>
+
+<script>
+const postId = {{ post.id }};
+let deleteImageIds = [];
+
+// 이미지 모달
+function openImageModal(src) {
+    document.getElementById('modalImage').src = src;
+    document.getElementById('imageModal').style.display = 'flex';
+}
+
+function closeImageModal() {
+    document.getElementById('imageModal').style.display = 'none';
+}
+
+// 수정 모달
+function openEditModal() {
+    document.getElementById('editModal').style.display = 'flex';
+}
+
+function closeEditModal() {
+    document.getElementById('editModal').style.display = 'none';
+    deleteImageIds = [];
+    document.querySelectorAll('.existing-image.marked-delete').forEach(el => {
+        el.classList.remove('marked-delete');
+    });
+}
+
+// 이미지 삭제 마킹
+function markImageDelete(imageId) {
+    const el = document.querySelector(`.existing-image[data-id="${imageId}"]`);
+    if (el.classList.contains('marked-delete')) {
+        el.classList.remove('marked-delete');
+        deleteImageIds = deleteImageIds.filter(id => id !== imageId);
+    } else {
+        el.classList.add('marked-delete');
+        deleteImageIds.push(imageId);
+    }
+    document.getElementById('deleteImages').value = deleteImageIds.join(',');
+}
+
+// 글 수정
+document.getElementById('editForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(this);
+    
+    try {
+        const response = await fetch(`/board/api/${postId}/update/`, {
+            method: 'POST',
+            body: formData,
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showToast(data.message);
+            location.reload();
+        } else {
+            showToast(data.error, 'error');
+        }
+    } catch (error) {
+        showToast('오류가 발생했습니다.', 'error');
+    }
+});
+
+// 글 삭제
+async function deletePost() {
+    if (!confirm('정말 삭제하시겠습니까?')) return;
+    
+    try {
+        const response = await fetchWithCSRF(`/board/api/${postId}/delete/`, {
+            method: 'POST',
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showToast(data.message);
+            window.location.href = '{% url "board:list" %}?category={{ post.category }}';
+        } else {
+            showToast(data.error, 'error');
+        }
+    } catch (error) {
+        showToast('오류가 발생했습니다.', 'error');
+    }
+}
+
+// 댓글 작성
+async function submitComment() {
+    const authorName = document.getElementById('commentAuthorName').value.trim() || '익명';
+    const content = document.getElementById('commentContent').value.trim();
+    
+    if (!content) {
+        showToast('내용을 입력해주세요.', 'error');
+        return;
+    }
+    
+    try {
+        const response = await fetchWithCSRF(`/board/api/${postId}/comment/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ author_name: authorName, content: content }),
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            // 빈 메시지 제거
+            const noComments = document.getElementById('noComments');
+            if (noComments) noComments.remove();
+            
+            // 새 댓글 추가
+            const commentHtml = `
+                <div class="comment-item" data-id="${data.comment.id}">
+                    <div class="comment-header">
+                        <span class="comment-author">${data.comment.author_name}</span>
+                        <span class="comment-date">${data.comment.created_at}</span>
+                        <button class="comment-delete" onclick="deleteComment(${data.comment.id})">&times;</button>
+                    </div>
+                    <div class="comment-content"><p>${data.comment.content}</p></div>
+                </div>
+            `;
+            document.getElementById('commentsList').insertAdjacentHTML('beforeend', commentHtml);
+            
+            // 입력 초기화
+            document.getElementById('commentContent').value = '';
+            
+            // 댓글 수 업데이트
+            const countEl = document.querySelector('.comment-count');
+            countEl.textContent = parseInt(countEl.textContent) + 1;
+            
+            showToast('댓글이 등록되었습니다.');
+        } else {
+            showToast(data.error, 'error');
+        }
+    } catch (error) {
+        showToast('오류가 발생했습니다.', 'error');
+    }
+}
+
+// 댓글 삭제
+async function deleteComment(commentId) {
+    if (!confirm('댓글을 삭제하시겠습니까?')) return;
+    
+    try {
+        const response = await fetchWithCSRF(`/board/api/comment/${commentId}/delete/`, {
+            method: 'POST',
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            document.querySelector(`.comment-item[data-id="${commentId}"]`).remove();
+            
+            const countEl = document.querySelector('.comment-count');
+            countEl.textContent = parseInt(countEl.textContent) - 1;
+            
+            showToast('댓글이 삭제되었습니다.');
+        } else {
+            showToast(data.error, 'error');
+        }
+    } catch (error) {
+        showToast('오류가 발생했습니다.', 'error');
+    }
+}
+
+// ESC로 모달 닫기
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        closeImageModal();
+        closeEditModal();
+    }
+});
+</script>
+{% endblock %}
+

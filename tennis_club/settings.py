@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     'members',
     'schedule',
     'matchmaking',
+    'board',
 ]
 
 MIDDLEWARE = [
@@ -118,6 +119,10 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 # Whitenoise for serving static files in production
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+
+# Media files (User uploads)
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
